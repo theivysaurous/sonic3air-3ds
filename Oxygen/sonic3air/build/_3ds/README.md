@@ -41,7 +41,7 @@ Open the **devkitPro MSYS2 shell** (not a normal command prompt). It sets `DEVKI
 
    This produces `sonic3air.3dsx`. Once that works, run `make clean` and then `make` (default `NATIVIZED=1`) for the faster script code. That compiles a very large generated file, so give it time and RAM.
 
-   **Optional, for an installable .cia** (recommended, see "Why a .cia" below): you need two small tools that don't come with devkitPro's package list, **makerom** and **bannertool**. Download the Windows builds, put both on your `PATH` (or in this folder), then:
+   **Optional, for an installable .cia** (recommended, see "Why a .cia" below): you need two small tools that don't come with devkitPro's package list, **makerom** and **bannertool**. Download the Windows builds ([makerom](https://github.com/3DSGuy/Project_CTR/releases) from Project_CTR, [bannertool](https://github.com/Steveice10/bannertool) by Steveice10) and copy `makerom.exe` and `bannertool.exe` into `C:\devkitPro\tools\bin` (the Makefile already looks there). Then:
 
    ```
    make cia NATIVIZED=0
