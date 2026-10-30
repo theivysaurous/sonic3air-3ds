@@ -96,6 +96,12 @@ void PlatformSpecifics::platformStartup()
 	osSetSpeedupEnable(true);
 
 	// Everything (game data, ROM, config, savedata, logs) lives in one folder on the SD card
-	changeWorkingDirectory(L"sdmc:/3ds/sonic3air");
+	try
+	{
+		rmx::FileSystem::setCurrentDirectory(L"sdmc:/3ds/sonic3air");
+	}
+	catch (...)
+	{
+	}
 #endif
 }
