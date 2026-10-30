@@ -554,7 +554,7 @@ namespace rmx
 		// Just use SDL for this
 		SDL_AudioSpec waveFormat;
 		unsigned char* waveData = nullptr;
-		unsigned int waveLength = 0;
+		Uint32 waveLength = 0;		// Must be SDL's own type: it's "unsigned long" on 3DS, while "unsigned int" would not convert
 		if (!SDL_LoadWAV(*source, &waveFormat, &waveData, &waveLength))
 			return false;
 
