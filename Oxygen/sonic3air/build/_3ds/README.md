@@ -65,7 +65,7 @@ Open the **devkitPro MSYS2 shell** (not a normal command prompt). It sets `DEVKI
 
 ### Why a .cia
 
-An installed .cia gets its memory mode from `sonic3air.rsf` (it asks for the New 3DS's larger application memory, 178 MB, with a 124 MB fallback noted in the file) and a 1 MB main stack. A `.3dsx` gets whatever the launching environment provides, so the .cia is the safer way to give the game enough RAM.
+An installed .cia gets its memory mode from `sonic3air.rsf` (it asks for the New 3DS's larger application memory, 124 MB). A `.3dsx` gets whatever the launching environment provides, so the .cia is the safer way to give the game enough RAM.
 
 Save data, config and any log files are written inside `/3ds/sonic3air/`.
 
@@ -73,7 +73,7 @@ Save data, config and any log files are written inside `/3ds/sonic3air/`.
 
 - **First start may be very slow, later starts should not be.** On the first start the game compiles its scripts from the `scripts` folder, then saves the result to `/3ds/sonic3air/saves/scripts.bin`. On every later start it loads that file instead. So the precompiling after first launch is already built in, as long as the `saves` folder exists (the staging script creates it). If the compile runs out of memory on the console, you can instead produce a `scripts.bin` with a PC build and drop it next to `stage_sdcard.sh`, then re-run the staging step. That is not guaranteed to match, so the on-device way is the first thing to try. If you change the scripts or update the build, delete `saves/scripts.bin` so it gets regenerated.
 - **Speed is unknown.** It may not hold 60 FPS. Tell me what you see and I'll look at what costs the most.
-- **Memory.** If the .cia fails to start, try `SystemModeExt : 124MB` in `sonic3air.rsf` and rebuild. If it crashes while loading, tell me where.
+- **Memory.** If it crashes while loading, tell me where.
 - **Audio.** It uses the emulated Genesis soundtrack at a 32 kHz sample rate. If there is no sound at all, the console may be missing its DSP firmware dump (`/3ds/dspfirm.cdc`), a common requirement for homebrew audio.
 - **Controls and UI.** The game screen is 400x224 on the top screen. The bottom screen is not used yet, and desktop-style menus (mods, online features) are not adapted for the 3DS.
 - **No network features.** Update checks and online features are not expected to work.

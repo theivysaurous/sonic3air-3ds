@@ -28,7 +28,7 @@ AccessControlInfo:
   # Memory: the New 3DS gives applications more RAM in these modes
   MemoryType              : Application
   SystemMode              : 64MB
-  SystemModeExt           : 178MB         # Use "124MB" if 178MB makes the app fail to start
+  SystemModeExt           : 124MB         # 124MB is the safe New 3DS mode. 178MB crashed during startup (heap allocation failed)
   CpuSpeed                : 804MHz
   EnableL2Cache           : true
 
@@ -138,4 +138,4 @@ AccessControlInfo:
 SystemControlInfo:
   SaveDataSize            : 0KB
   RemasterVersion         : 0
-  StackSize               : 0x100000     # Main thread stack (1 MB); in a .cia this comes from here, not from __stacksize__
+  StackSize               : 0x100000     # Only the small startup stack. The game's real main stack is taken from the heap, sized by __stacksize__ in main.cpp
