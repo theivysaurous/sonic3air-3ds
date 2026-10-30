@@ -52,11 +52,11 @@ INCLUDES   := \
 	-I$(BASEDIR)/framework/external/zlib/zlib \
 	-I$(BASEDIR)/framework/external/zlib/zlib/contrib/minizip \
 	-I$(BASEDIR)/framework/external/imgui \
-	-I$(PORTLIBS)/include -I$(CTRULIB)/include
+	-I$(PORTLIBS)/include -I$(PORTLIBS)/include/SDL2 -I$(CTRULIB)/include
 
 DEFINES    := -D__3DS__ -DARM -DENDUSER -DNDEBUG
 
-COMMON     := -g $(OPTLEVEL) -mword-relocations -ffunction-sections -fdata-sections -w $(ARCH)
+COMMON     := -g $(OPTLEVEL) -mword-relocations -ffunction-sections -fdata-sections -w -Wno-psabi $(ARCH)
 CFLAGS     := $(COMMON) $(DEFINES) $(INCLUDES)
 CXXFLAGS   := $(CFLAGS) -std=gnu++17 -fexceptions
 LDFLAGS    := -specs=3dsx.specs -g $(ARCH) -Wl,--gc-sections -Wl,-Map,$(TARGET).map
