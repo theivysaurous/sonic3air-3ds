@@ -1,0 +1,17 @@
+{
+	// Configuration for the Nintendo 3DS build, copied to the SD card as "config.json" by stage_sdcard.sh
+
+	// Paths
+	"ScriptsDir":     "scripts",
+	"MainScriptName": "main.lemon",
+	"SaveStatesDir":  "saves/states",
+
+	// Video: Pure software renderer, game screen is exactly the 3DS top screen's width
+	"RenderMethod": "software",
+	"GameScreen":   "400 x 224",
+	"Filtering":    "0",
+
+	// Script / Debug
+	"CompileScripts":  "0",
+	"WaitForDebugger": "0"
+}

@@ -35,6 +35,8 @@ namespace
 		return "web";
 	#elif defined(PLATFORM_SWITCH)
 		return "switch";
+	#elif defined(PLATFORM_3DS)
+		return "3ds";
 	#else
 		return "unknown";
 	#endif

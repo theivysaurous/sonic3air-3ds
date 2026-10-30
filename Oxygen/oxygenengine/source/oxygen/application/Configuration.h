@@ -204,6 +204,8 @@ public:
 	WindowMode mWindowMode = WindowMode::WINDOWED;
 #if defined(PLATFORM_VITA)
 	Vec2i mWindowSize = Vec2i(960, 544);
+#elif defined(PLATFORM_3DS)
+	Vec2i mWindowSize = Vec2i(400, 240);		// Top screen of the 3DS
 #else
 	Vec2i mWindowSize = Vec2i(1200, 672);
 #endif

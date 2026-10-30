@@ -376,6 +376,9 @@ void EngineMain::initDirectories()
 	#elif defined(PLATFORM_VITA)
 		// Vita
 		config.mAppDataPath = L"ux0:data/sonic3air/savedata/";
+	#elif defined(PLATFORM_3DS)
+		// Nintendo 3DS (SD card)
+		config.mAppDataPath = L"sdmc:/3ds/sonic3air/savedata/";
 	#elif !defined(PLATFORM_IOS)
 		// Choose app data path
 		{
@@ -498,7 +501,7 @@ bool EngineMain::initConfigAndSettings()
 	if (config.mRenderMethod > Configuration::getHighestSupportedRenderMethod())
 		config.mRenderMethod = Configuration::getHighestSupportedRenderMethod();
 
-#if defined(PLATFORM_ANDROID) || defined(PLATFORM_IOS) || defined(PLATFORM_VITA)
+#if defined(PLATFORM_ANDROID) || defined(PLATFORM_IOS) || defined(PLATFORM_VITA) || defined(PLATFORM_3DS)
 	// Use fullscreen, with no borders please
 	//  -> Note that this doesn't work for the web version, if running in mobile browsers - we rely on a window with fixed size (see config.json) there
 	config.mWindowMode = Configuration::WindowMode::FULLSCREEN_EXCLUSIVE;

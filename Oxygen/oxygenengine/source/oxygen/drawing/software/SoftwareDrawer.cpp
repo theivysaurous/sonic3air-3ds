@@ -135,6 +135,7 @@ namespace softwaredrawer
 		void setupScreenSurface(SDL_Window* window)
 		{
 			mOutputWindow = window;
+			mSurfaceReverseBytes = false;
 
 			mScreenSurface = SDL_GetWindowSurface(window);
 			RMX_CHECK(nullptr != mScreenSurface, "Could not get SDL screen surface", return);
@@ -170,7 +171,16 @@ namespace softwaredrawer
 					break;
 				}
 
-				// TODO: We could also support e.g. SDL_PIXELFORMAT_RGBA8888 by shifting everything by one byte in "getOutputWrapper"
+			#ifndef RMX_USE_SDL3
+				case SDL_PIXELFORMAT_RGBA8888:		// Used on Nintendo 3DS (framebuffer format GSP_RGBA8_OES)
+				{
+					// Draw into an intermediate buffer in our native format (ABGR8888), then reverse the byte order of each pixel when presenting
+					formatSupported = true;
+					mSurfaceSwapRedBlue = false;
+					mSurfaceReverseBytes = true;
+					break;
+				}
+			#endif
 			}
 
 			if (formatSupported)
@@ -237,9 +247,20 @@ namespace softwaredrawer
 				{
 					if (!mIsScreenSurfaceLocked)
 					{
-						SDL_LockSurface(mScreenSurface);
-						mIsScreenSurfaceLocked = true;
-						mOutputWrapper = BitmapViewMutable<uint32>((uint32*)mScreenSurface->pixels, Vec2i(mScreenSurface->w, mScreenSurface->h));
+						if (mSurfaceReverseBytes)
+						{
+							// Not touching the SDL surface until presenting, instead draw into the intermediate buffer
+							if (mIntermediateBuffer.getWidth() != mScreenSurface->w || mIntermediateBuffer.getHeight() != mScreenSurface->h)
+								mIntermediateBuffer.create(mScreenSurface->w, mScreenSurface->h, 0xff000000);
+							mIsScreenSurfaceLocked = true;
+							mOutputWrapper = BitmapViewMutable<uint32>(mIntermediateBuffer.getData(), Vec2i(mScreenSurface->w, mScreenSurface->h));
+						}
+						else
+						{
+							SDL_LockSurface(mScreenSurface);
+							mIsScreenSurfaceLocked = true;
+							mOutputWrapper = BitmapViewMutable<uint32>((uint32*)mScreenSurface->pixels, Vec2i(mScreenSurface->w, mScreenSurface->h));
+						}
 					}
 				}
 				else
@@ -296,7 +317,28 @@ namespace softwaredrawer
 		{
 			if (nullptr != mScreenSurface && mIsScreenSurfaceLocked)
 			{
-				SDL_UnlockSurface(mScreenSurface);
+				if (mSurfaceReverseBytes)
+				{
+					// Convert from ABGR8888 (intermediate buffer) to RGBA8888 (SDL surface)
+					SDL_LockSurface(mScreenSurface);
+					const int width = std::min(mScreenSurface->w, mIntermediateBuffer.getWidth());
+					const int height = std::min(mScreenSurface->h, mIntermediateBuffer.getHeight());
+					for (int y = 0; y < height; ++y)
+					{
+						const uint32* src = mIntermediateBuffer.getPixelPointer(0, y);
+						uint32* dst = (uint32*)((uint8*)mScreenSurface->pixels + y * mScreenSurface->pitch);
+						for (int x = 0; x < width; ++x)
+						{
+							const uint32 color = src[x];
+							dst[x] = (color >> 24) | ((color >> 8) & 0x0000ff00) | ((color << 8) & 0x00ff0000) | (color << 24);
+						}
+					}
+					SDL_UnlockSurface(mScreenSurface);
+				}
+				else
+				{
+					SDL_UnlockSurface(mScreenSurface);
+				}
 				mIsScreenSurfaceLocked = false;
 			}
 		}
@@ -445,6 +487,8 @@ namespace softwaredrawer
 		SDL_Window* mOutputWindow = nullptr;
 		SDL_Surface* mScreenSurface = nullptr;
 		bool mSurfaceSwapRedBlue = false;
+		bool mSurfaceReverseBytes = false;		// True if the surface is RGBA8888 and we need an intermediate buffer in ABGR8888
+		Bitmap mIntermediateBuffer;
 
 		BlendMode mCurrentBlendMode = BlendMode::OPAQUE;
 		SamplingMode mCurrentSamplingMode = SamplingMode::POINT;

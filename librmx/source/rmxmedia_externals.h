@@ -112,6 +112,9 @@
 	#include <vitaGL.h>
 	#define RMX_USE_GLES2
 
+#elif defined(PLATFORM_3DS)
+	// No OpenGL on 3DS, software rendering only (RMX_WITH_OPENGL_SUPPORT is not defined)
+
 #else
 	#error Unsupported platform
 #endif

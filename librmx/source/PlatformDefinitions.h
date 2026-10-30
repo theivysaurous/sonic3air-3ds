@@ -18,10 +18,16 @@
 //  - PLATFORM_WEB		-> Web version (via emscripten)
 //  - PLATFORM_SWITCH	-> Nintendo Switch (homebrew)
 //  - PLATFORM_VITA		-> Playstation Vita (homebrew)
+//  - PLATFORM_3DS		-> Nintendo 3DS / New 3DS (homebrew, devkitARM)
 
 
 // Platform specific
-#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
+#if defined(__3DS__)
+	// Must be checked first, as devkitARM does not define any of the others
+	#define PLATFORM_3DS
+	#define USE_UTF8_PATHS
+
+#elif defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
 	#define PLATFORM_WINDOWS
 	#if defined(__GNUC__)
 		#define USE_UTF8_PATHS

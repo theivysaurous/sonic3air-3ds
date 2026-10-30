@@ -226,7 +226,9 @@ namespace
 
 Configuration::RenderMethod Configuration::getHighestSupportedRenderMethod()
 {
-#if defined(PLATFORM_WEB) || (defined(PLATFORM_MAC) && defined(__arm64__)) || defined(PLATFORM_VITA)
+#if defined(PLATFORM_3DS)
+	return RenderMethod::SOFTWARE;
+#elif defined(PLATFORM_WEB) || (defined(PLATFORM_MAC) && defined(__arm64__)) || defined(PLATFORM_VITA)
 	return RenderMethod::OPENGL_SOFT;
 #else
 	// Default is OpenGL Hardware render method (as it's the highest one), but this can be lowered as needed, e.g. for individual platforms or depending on the execution environment
@@ -244,6 +246,13 @@ Configuration::Configuration()
 #if defined(PLATFORM_WEB)
 	// Threading in general is not (afaik) supported by emscripten
 	mAudio.mUseAudioThreading = false;
+#endif
+
+#if defined(PLATFORM_3DS)
+	// Keep CPU load and memory use low: Lower sample rate, no extra audio thread (the 3DS threading is cooperative anyways)
+	mAudio.mSampleRate = 32000;
+	mAudio.mUseAudioThreading = false;
+	mWindowMode = WindowMode::FULLSCREEN_EXCLUSIVE;
 #endif
 
 #if defined(PLATFORM_ANDROID) || defined(PLATFORM_WEB)

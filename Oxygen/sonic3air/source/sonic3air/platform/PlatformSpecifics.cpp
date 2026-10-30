@@ -13,6 +13,8 @@
 	#include <vitasdk.h>
 	#include <vitaGL.h>
 	#include "sonic3air/platform/vita/trophies.h"
+#elif defined(PLATFORM_3DS)
+	#include <3ds.h>
 #endif
 
 
@@ -88,5 +90,12 @@ void PlatformSpecifics::platformStartup()
 	}
 
 	changeWorkingDirectory(L"ux0:/data/sonic3air");
+
+#elif defined(PLATFORM_3DS)
+	// Use the New 3DS' faster CPU clock and extra L2 cache (does nothing on an Old 3DS)
+	osSetSpeedupEnable(true);
+
+	// Everything (game data, ROM, config, savedata, logs) lives in one folder on the SD card
+	changeWorkingDirectory(L"sdmc:/3ds/sonic3air");
 #endif
 }
