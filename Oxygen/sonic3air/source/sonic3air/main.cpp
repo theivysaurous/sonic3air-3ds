@@ -57,7 +57,56 @@ extern "C"
 #endif
 
 
+#if defined(PLATFORM_3DS)
+
+#include <3ds.h>
+
+// The real "main" of the game, see below
+static int gameMain(int argc, char** argv);
+
+namespace
+{
+	struct GameMainArgs
+	{
+		int mArgc = 0;
+		char** mArgv = nullptr;
+		int mResult = 0;
+	};
+
+	void gameMainThreadEntry(void* arg)
+	{
+		GameMainArgs& args = *static_cast<GameMainArgs*>(arg);
+		args.mResult = gameMain(args.mArgc, args.mArgv);
+	}
+}
+
 int main(int argc, char** argv)
+{
+	// Run the whole game on a thread with a big stack of our own choosing
+	//  -> The main thread's stack is small, and the script compiler recurses quite deeply; this does not depend on libctru's "__stacksize__" handling
+	GameMainArgs args;
+	args.mArgc = argc;
+	args.mArgv = argv;
+
+	s32 priority = 0x30;
+	svcGetThreadPriority(&priority, CUR_THREAD_HANDLE);
+
+	Thread thread = threadCreate(&gameMainThreadEntry, &args, 8 * 1024 * 1024, priority, -2, false);
+	if (nullptr == thread)
+	{
+		// Could not create the thread, just run on the main thread then
+		return gameMain(argc, argv);
+	}
+
+	threadJoin(thread, U64_MAX);
+	threadFree(thread);
+	return args.mResult;
+}
+
+static int gameMain(int argc, char** argv)
+#else
+int main(int argc, char** argv)
+#endif
 {
 	EngineMain::earlySetup();
 	PlatformSpecifics::platformStartup();
