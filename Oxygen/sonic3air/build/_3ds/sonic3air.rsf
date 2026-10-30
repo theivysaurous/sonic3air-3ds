@@ -1,0 +1,86 @@
+# makerom spec for building a .cia (New 3DS only, uses the larger New 3DS memory mode)
+#
+# NOTE: Written from the makerom spec format without being able to run makerom here. If makerom complains about a field,
+#       the error message names it, and it's a quick edit in this file.
+
+BasicInfo:
+  Title                   : Sonic3AIR
+  CompanyCode             : "00"
+  ProductCode             : CTR-P-S3AR
+  ContentType             : Application
+  Logo                    : Nintendo
+
+TitleInfo:
+  Category                : Application
+  UniqueId                : 0xF3A51        # Arbitrary ID in the homebrew range; change it if it clashes with another app
+
+Option:
+  UseOnSD                 : true
+  FreeProductCode         : true
+  MediaFootPadding        : false
+  EnableCrypt             : false
+  EnableCompress          : true
+
+AccessControlInfo:
+  CoreVersion             : 2
+  DescVersion             : 2
+
+  # Memory: the New 3DS gives applications more RAM in these modes
+  MemoryType              : Application
+  SystemMode              : 64MB
+  SystemModeExt           : 178MB         # Use "124MB" if 178MB makes the app fail to start
+  CpuSpeed                : 804MHz
+  EnableL2Cache           : true
+
+  IdealProcessor          : 0
+  AffinityMask            : 1
+  Priority                : 16
+  MaxCpu                  : 0x9E
+
+  # Direct access to the SD card, needed for /3ds/sonic3air/
+  FileSystemAccess:
+    - DirectSdmc
+
+  DisableDebug            : false
+  EnableForceDebug        : false
+  CanWriteSharedPage      : true
+  CanUsePrivilegedPriority: false
+  CanUseNonAlphabetAndNumber: true
+  PermitMainFunctionArgument: true
+  CanShareDeviceMemory    : true
+  RunnableOnSleep         : false
+  SpecialMemoryArrange    : true
+
+  ReleaseKernelMajor      : "02"
+  ReleaseKernelMinor      : "33"
+
+  ServiceAccessControl:
+    - APT:U
+    - ac:u
+    - am:net
+    - boss:P
+    - cfg:u
+    - csnd:SND
+    - dsp::DSP
+    - frd:u
+    - fs:USER
+    - gsp::Gpu
+    - hid:USER
+    - http:C
+    - ir:rst
+    - ir:u
+    - ir:USER
+    - mic:u
+    - ndm:u
+    - news:u
+    - nwm::EXT
+    - ptm:u
+    - pxi:dev
+    - soc:U
+    - ssl:C
+    - y2r:u
+
+SystemControlInfo:
+  SaveDataSize            : 0KB
+  RemasterVersion         : 0
+  StackSize               : 0x100000     # Main thread stack (1 MB); in a .cia this comes from here, not from __stacksize__

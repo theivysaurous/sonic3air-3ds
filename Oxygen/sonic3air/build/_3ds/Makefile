@@ -2,6 +2,7 @@
 # Sonic 3 A.I.R. for Nintendo 3DS (New 3DS only, software renderer)
 #
 #   make            Build sonic3air.3dsx
+#   make cia        Build an installable sonic3air.cia (needs makerom + bannertool, see README.md)
 #   make NATIVIZED=0   Skip the huge "nativized" script code (much faster to compile, but the game runs slower)
 #   make clean
 #
@@ -98,7 +99,7 @@ THIRDPARTY_CFLAGS := -I$(BASEDIR)/framework/external/ogg-vorbis/libvorbis/lib -D
 OBJECTS := $(addprefix $(BUILDDIR)/, $(addsuffix .o, $(basename $(CPP_SOURCES) $(C_SOURCES))))
 
 #---------------------------------------------------------------------------------
-.PHONY: all clean
+.PHONY: all clean cia
 
 all: $(TARGET).3dsx
 
@@ -109,6 +110,21 @@ $(TARGET).smdh: icon.png
 $(TARGET).3dsx: $(TARGET).elf $(TARGET).smdh
 	@echo "Creating $@"
 	@3dsxtool $(TARGET).elf $@ --smdh=$(TARGET).smdh
+
+# Installable .cia (needs "makerom" and "bannertool" on the PATH, see README.md)
+cia: $(TARGET).cia
+
+banner.bnr: banner.png banner.wav
+	@echo "Creating $@"
+	@bannertool makebanner -i banner.png -a banner.wav -o $@
+
+icon.icn: icon.png
+	@echo "Creating $@"
+	@bannertool makesmdh -s "$(APP_TITLE)" -l "$(APP_DESC)" -p "$(APP_AUTHOR)" -i icon.png -o $@
+
+$(TARGET).cia: $(TARGET).elf $(TARGET).rsf banner.bnr icon.icn
+	@echo "Creating $@"
+	@makerom -f cia -o $@ -target t -exefslogo -elf $(TARGET).elf -rsf $(TARGET).rsf -banner banner.bnr -icon icon.icn
 
 $(TARGET).elf: $(OBJECTS)
 	@echo "Linking $@"
@@ -136,4 +152,4 @@ $(BUILDDIR)/%.o: $(BASEDIR)/%.cpp
 
 clean:
 	@echo "Cleaning"
-	@rm -rf $(BUILDDIR) stub $(TARGET).elf $(TARGET).3dsx $(TARGET).smdh $(TARGET).map
+	@rm -rf $(BUILDDIR) stub $(TARGET).elf $(TARGET).3dsx $(TARGET).smdh $(TARGET).map $(TARGET).cia banner.bnr icon.icn

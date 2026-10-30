@@ -41,6 +41,14 @@ Open the **devkitPro MSYS2 shell** (not a normal command prompt). It sets `DEVKI
 
    This produces `sonic3air.3dsx`. Once that works, run `make clean` and then `make` (default `NATIVIZED=1`) for the faster script code. That compiles a very large generated file, so give it time and RAM.
 
+   **Optional, for an installable .cia** (recommended, see "Why a .cia" below): you need two small tools that don't come with devkitPro's package list, **makerom** and **bannertool**. Download the Windows builds, put both on your `PATH` (or in this folder), then:
+
+   ```
+   make cia NATIVIZED=0
+   ```
+
+   This produces `sonic3air.cia` using `sonic3air.rsf`. I wrote that file from the makerom format without being able to run makerom, so if makerom rejects a field, send me the message.
+
 5. Collect everything for the SD card:
 
    ```
@@ -51,17 +59,21 @@ Open the **devkitPro MSYS2 shell** (not a normal command prompt). It sets `DEVKI
 
 ## Put it on the SD card
 
-1. Copy the contents of the `sdcard` folder to the **root** of your SD card, so you end up with `/3ds/sonic3air/sonic3air.3dsx`.
+1. Copy the contents of the `sdcard` folder to the **root** of your SD card, so you end up with `/3ds/sonic3air/` (the game data is needed either way). If you built a .cia, `sonic3air.cia` is in there too.
 2. Copy your ROM to `/3ds/sonic3air/Sonic_Knuckles_wSonic3.bin`.
-3. Start it from the Homebrew Launcher.
+3. Start it from the Homebrew Launcher (`.3dsx`), or install `sonic3air.cia` with a CIA installer such as FBI and start it from the HOME menu. The data still lives in `/3ds/sonic3air/` on the SD card; only the program itself is installed.
+
+### Why a .cia
+
+An installed .cia gets its memory mode from `sonic3air.rsf` (it asks for the New 3DS's larger application memory, 178 MB, with a 124 MB fallback noted in the file) and a 1 MB main stack. A `.3dsx` gets whatever the launching environment provides, so the .cia is the safer way to give the game enough RAM.
 
 Save data, config and any log files are written inside `/3ds/sonic3air/`.
 
 ## What to expect and known risks
 
-- **First start may be very slow.** The game scripts get compiled on launch unless a precompiled `scripts.bin` exists. If you produce one on the PC build, drop it next to `stage_sdcard.sh` as `scripts.bin` and re-run the staging step.
+- **First start may be very slow, later starts should not be.** On the first start the game compiles its scripts from the `scripts` folder, then saves the result to `/3ds/sonic3air/saves/scripts.bin`. On every later start it loads that file instead. So the precompiling after first launch is already built in, as long as the `saves` folder exists (the staging script creates it). If the compile runs out of memory on the console, you can instead produce a `scripts.bin` with a PC build and drop it next to `stage_sdcard.sh`, then re-run the staging step. That is not guaranteed to match, so the on-device way is the first thing to try. If you change the scripts or update the build, delete `saves/scripts.bin` so it gets regenerated.
 - **Speed is unknown.** It may not hold 60 FPS. Tell me what you see and I'll look at what costs the most.
-- **Memory.** The amount of RAM a `.3dsx` gets can depend on how it's launched. If it crashes right at startup or while loading, tell me; the likely fix is building a `.cia` with a larger memory mode.
+- **Memory.** If the .cia fails to start, try `SystemModeExt : 124MB` in `sonic3air.rsf` and rebuild. If it crashes while loading, tell me where.
 - **Audio.** It uses the emulated Genesis soundtrack at a 32 kHz sample rate. If there is no sound at all, the console may be missing its DSP firmware dump (`/3ds/dspfirm.cdc`), a common requirement for homebrew audio.
 - **Controls and UI.** The game screen is 400x224 on the top screen. The bottom screen is not used yet, and desktop-style menus (mods, online features) are not adapted for the 3DS.
 - **No network features.** Update checks and online features are not expected to work.

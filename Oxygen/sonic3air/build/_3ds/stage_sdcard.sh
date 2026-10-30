@@ -38,6 +38,12 @@ if [ -f "$HERE/scripts.bin" ]; then
 	echo "Included precompiled scripts.bin"
 fi
 
+# Optional: the installable .cia (built with 'make cia'), put next to the "3ds" folder for easy installing (e.g. with FBI)
+if [ -f "$HERE/sonic3air.cia" ]; then
+	cp "$HERE/sonic3air.cia" "$OUT/"
+	echo "Included sonic3air.cia (install it, it doesn't need to stay on the SD card)"
+fi
+
 echo
 echo "Done: $DEST"
 echo "Now copy the contents of '$OUT' to the root of your SD card, and put your own"
