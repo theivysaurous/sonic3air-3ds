@@ -94,7 +94,7 @@ endif
 C_SOURCES := $(OGG_SOURCES) $(VORBIS_SOURCES) $(ZLIB_SOURCES)
 
 # Third party C code needs a few extra flags
-THIRDPARTY_CFLAGS := -I$(BASEDIR)/framework/external/ogg-vorbis/libvorbis/lib -DNOUNCRYPT -DNOCRYPT -DHAVE_UNISTD_H=1
+THIRDPARTY_CFLAGS := -I$(BASEDIR)/framework/external/ogg-vorbis/libvorbis/lib -DNOUNCRYPT -DNOCRYPT -DHAVE_UNISTD_H=1 -DIOAPI_NO_64
 
 OBJECTS := $(addprefix $(BUILDDIR)/, $(addsuffix .o, $(basename $(CPP_SOURCES) $(C_SOURCES))))
 
