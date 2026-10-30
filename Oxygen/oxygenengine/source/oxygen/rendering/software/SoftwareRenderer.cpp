@@ -73,7 +73,10 @@ namespace detail
 			uint64* dst = (uint64*)&mContent[mPosition + x];
 			const uint64* srcPatternPixels = (uint64*)&pattern.mPixels[mPatternPixelOffset];
 
-		#if !defined(PLATFORM_VITA)
+		#if defined(PLATFORM_3DS)
+			// Avoid 64-bit loads / stores on potentially misaligned addresses (ARM11)
+			memcpy(dst, srcPatternPixels, sizeof(*dst));
+		#elif !defined(PLATFORM_VITA)
 			*dst = *srcPatternPixels;
 		#else
 			// This fixes a crash

@@ -18,7 +18,24 @@
 
 namespace rmx
 {
-#if !defined(__vita__)
+#if defined(PLATFORM_3DS)
+	// ARM11 (ARMv6K): Don't rely on unaligned loads for types without a byte-wise specialization below (e.g. int32, float)
+	template<typename T>
+	T readMemoryUnaligned(const void* pointer)
+	{
+		T val;
+		__builtin_memcpy(&val, pointer, sizeof(T));
+		return val;
+	}
+
+	template<typename T>
+	T readMemoryUnalignedSwapped(const void* pointer)
+	{
+		T val;
+		__builtin_memcpy(&val, pointer, sizeof(T));
+		return swapBytes<T>(val);
+	}
+#elif !defined(__vita__)
 	template<typename T>
 	T readMemoryUnaligned(const void* pointer) { return *(T*)pointer; }
 

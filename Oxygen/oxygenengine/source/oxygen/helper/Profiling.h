@@ -29,7 +29,7 @@ namespace ProfilingRegion
 class Profiling
 {
 public:
-#if defined(PLATFORM_ANDROID) || defined(PLATFORM_VITA)
+#if defined(PLATFORM_ANDROID) || defined(PLATFORM_VITA) || defined(PLATFORM_3DS)
 	static const constexpr size_t MAX_FRAMES = 90;
 #else
 	static const constexpr size_t MAX_FRAMES = 240;

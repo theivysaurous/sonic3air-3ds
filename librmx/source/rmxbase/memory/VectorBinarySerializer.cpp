@@ -30,7 +30,9 @@ namespace
 		{
 			const size_t oldSize = buffer.size();
 			buffer.resize(oldSize + sizeof(T));
-		#if !defined(PLATFORM_VITA)
+		#if defined(PLATFORM_3DS)
+			memcpy(&buffer[oldSize], &value, sizeof(T));
+		#elif !defined(PLATFORM_VITA)
 			*(T*)&buffer[oldSize] = value;
 		#else
 			// Use memcpy to avoid issues with unaligned memory access

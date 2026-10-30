@@ -60,7 +60,8 @@ CFLAGS     := $(COMMON) $(DEFINES) $(INCLUDES)
 CXXFLAGS   := $(CFLAGS) -std=gnu++17 -fexceptions
 LDFLAGS    := -specs=3dsx.specs -g $(ARCH) -Wl,--gc-sections -Wl,-Map,$(TARGET).map
 LIBPATHS   := -L$(PORTLIBS)/lib -L$(CTRULIB)/lib
-LIBS       := -lSDL2 -lctru -lm
+# SDL2main provides the real "main" on 3DS (it calls SDL_main, which is what "main" gets renamed to via SDL_main.h)
+LIBS       := -lSDL2main -lSDL2 -lctru -lm
 
 #---------------------------------------------------------------------------------
 # Sources

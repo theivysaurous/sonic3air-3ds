@@ -67,7 +67,10 @@ namespace rmx
 	{
 		if (!mIsThreadRunning)
 		{
-		#if !defined(PLATFORM_VITA)
+		#if defined(PLATFORM_3DS)
+			// The default thread stack size on 3DS is tiny
+			mSDLThread = SDL_CreateThreadWithStackSize(ThreadBase::runThreadStatic, mName.c_str(), 256 * 1024, this);
+		#elif !defined(PLATFORM_VITA)
 			mSDLThread = SDL_CreateThread(ThreadBase::runThreadStatic, mName.c_str(), this);
 		#else
 			mSDLThread = SDL_CreateThreadWithStackSize(ThreadBase::runThreadStatic, mName.c_str(), 4 * 1024 * 1024, this);
