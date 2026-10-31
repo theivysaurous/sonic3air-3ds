@@ -41,7 +41,7 @@ Open the **devkitPro MSYS2 shell** (not a normal command prompt). It sets `DEVKI
 
    This produces `sonic3air.3dsx`. Once that works, run `make clean` and then `make` (default `NATIVIZED=1`) for the faster script code. That compiles a very large generated file, so give it time and RAM.
 
-   **Optional, for an installable .cia** (recommended, see "Why a .cia" below): you need two small tools that don't come with devkitPro's package list, **makerom** and **bannertool**. Download the Windows builds ([makerom](https://github.com/3DSGuy/Project_CTR/releases) from Project_CTR, [bannertool](https://github.com/Steveice10/bannertool) by Steveice10) and copy `makerom.exe` and `bannertool.exe` into `C:\devkitPro\tools\bin` (the Makefile already looks there). Then:
+   **Optional, for an installable .cia** (recommended, see "Why a .cia" below): you need **makerom**, which doesn't come with devkitPro's package list. `banner.bnr` and `icon.icn` are already included; delete them if you want to regenerate them, which needs **bannertool** too. Download the Windows builds ([makerom](https://github.com/3DSGuy/Project_CTR/releases) from Project_CTR, [bannertool](https://github.com/Steveice10/bannertool) by Steveice10) and copy `makerom.exe` and `bannertool.exe` into `C:\devkitPro\tools\bin` (the Makefile already looks there). Then:
 
    ```
    make cia NATIVIZED=0
@@ -55,11 +55,13 @@ Open the **devkitPro MSYS2 shell** (not a normal command prompt). It sets `DEVKI
    ./stage_sdcard.sh
    ```
 
-   This creates `sdcard/3ds/sonic3air/` with the `.3dsx`, data, scripts and a 3DS `config.json`. It leaves out the 126 MB remastered soundtrack.
+   This creates `sdcard/` with `3ds/sonic3air.3dsx`, `3ds/sonic3air/` (data, scripts, a 3DS `config.json`, a 3DS-sized disclaimer image) and, if you built one, `cias/sonic3air.cia`. It leaves out the 126 MB remastered soundtrack.
+
+   **For speed, build without `NATIVIZED=0`** (`make clean`, then `make cia`): the nativized script code is much faster than the script interpreter and is the biggest single performance gain. The `NATIVIZED=0` build is only for quick test builds.
 
 ## Put it on the SD card
 
-1. Copy the contents of the `sdcard` folder to the **root** of your SD card, so you end up with `/3ds/sonic3air/` (the game data is needed either way). If you built a .cia, `sonic3air.cia` is in there too.
+1. Copy the contents of the `sdcard` folder to the **root** of your SD card, so you end up with `/3ds/sonic3air.3dsx`, `/3ds/sonic3air/` (the game data is needed either way) and, if you built a .cia, `/cias/sonic3air.cia`.
 2. Copy your ROM to `/3ds/sonic3air/Sonic_Knuckles_wSonic3.bin`.
 3. Start it from the Homebrew Launcher (`.3dsx`), or install `sonic3air.cia` with a CIA installer such as FBI and start it from the HOME menu. The data still lives in `/3ds/sonic3air/` on the SD card; only the program itself is installed.
 
