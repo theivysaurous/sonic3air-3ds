@@ -11,7 +11,6 @@ It boots, reaches the title screen and menus, and is playable on a New 3DS (inst
 Known problems:
 - **Frame rate** is not stable yet (around 28-30 fps in testing, before building with the nativized scripts, which should be faster).
 - The **sound** can be a bit crunchy, probably tied to the frame rate.
-- **NTR screen streaming** shows wrong colours (the console screen itself is fine).
 - The **HOME menu banner sound** may not play yet.
 - Original **Genesis soundtrack only**: the 126 MB remastered OGG music is not included.
 - Online features, update checks and mods are not adapted for the 3DS. The bottom screen is not used.
@@ -40,7 +39,7 @@ Copy the generated `sdcard` folder to the root of your SD card.
 
 ## You need your own ROM
 
-The game needs a **Sonic 3 & Knuckles (with Sonic 3 locked on)** ROM that you own, named `Sonic_Knuckles_wSonic3.bin`, placed in `/3ds/sonic3air/` on the SD card. No ROM or other SEGA game files are in this repository or may be distributed with it.
+The game needs a **Sonic 3 & Knuckles** ROM that you own, named `Sonic_Knuckles_wSonic3.bin`, placed in `/3ds/sonic3air/` on the SD card. No ROM or other SEGA game files are in this repository or may be distributed with it.
 
 ## License and disclaimer
 
