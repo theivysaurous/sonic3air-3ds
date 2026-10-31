@@ -15,14 +15,18 @@ if [ ! -f "$HERE/sonic3air.3dsx" ]; then
 	exit 1
 fi
 
-rm -rf "$DEST"
+rm -rf "$DEST" "$OUT/3ds/sonic3air.3dsx" "$OUT/cias/sonic3air.cia"
 mkdir -p "$DEST/data" "$DEST/saves" "$DEST/savedata"
 
-cp "$HERE/sonic3air.3dsx" "$DEST/"
+# The .3dsx goes directly into the "3ds" folder (where the Homebrew Launcher looks), the game data stays in "3ds/sonic3air"
+cp "$HERE/sonic3air.3dsx" "$OUT/3ds/sonic3air.3dsx"
 
 # Engine data first, then game data on top (the 3DS build uses one merged "data" folder)
 cp -r "$ROOT/Oxygen/oxygenengine/data/." "$DEST/data/"
 cp -r "$ROOT/Oxygen/sonic3air/data/."    "$DEST/data/"
+
+# A disclaimer image made for the 400x224 screen (the original is a 1920x1080 image with text that is unreadable when scaled down)
+cp "$HERE/disclaimer.png" "$DEST/data/images/menu/disclaimer.png"
 
 # The remastered soundtrack (126 MB of OGG) is far too heavy for the 3DS, the game falls back to the original (emulated) soundtrack
 rm -rf "$DEST/data/audio/remastered"
@@ -38,10 +42,11 @@ if [ -f "$HERE/scripts.bin" ]; then
 	echo "Included precompiled scripts.bin"
 fi
 
-# Optional: the installable .cia (built with 'make cia'), put next to the "3ds" folder for easy installing (e.g. with FBI)
+# Optional: the installable .cia (built with 'make cia'), goes into a "cias" folder
 if [ -f "$HERE/sonic3air.cia" ]; then
-	cp "$HERE/sonic3air.cia" "$OUT/"
-	echo "Included sonic3air.cia (install it, it doesn't need to stay on the SD card)"
+	mkdir -p "$OUT/cias"
+	cp "$HERE/sonic3air.cia" "$OUT/cias/"
+	echo "Included cias/sonic3air.cia (install it with e.g. FBI, it doesn't need to stay on the SD card)"
 fi
 
 echo
