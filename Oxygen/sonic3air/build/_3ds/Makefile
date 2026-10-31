@@ -114,11 +114,12 @@ $(TARGET).3dsx: $(TARGET).elf $(TARGET).smdh
 # Installable .cia (needs "makerom" and "bannertool" on the PATH, see README.md)
 cia: $(TARGET).cia
 
-banner.bnr: banner.png banner.wav
+# Prebuilt banner.bnr / icon.icn are shipped; delete them to regenerate with bannertool
+banner.bnr:
 	@echo "Creating $@"
 	@bannertool makebanner -i banner.png -a banner.wav -o $@
 
-icon.icn: icon.png
+icon.icn:
 	@echo "Creating $@"
 	@bannertool makesmdh -s "$(APP_TITLE)" -l "$(APP_DESC)" -p "$(APP_AUTHOR)" -i icon.png -o $@
 
@@ -152,4 +153,4 @@ $(BUILDDIR)/%.o: $(BASEDIR)/%.cpp
 
 clean:
 	@echo "Cleaning"
-	@rm -rf $(BUILDDIR) stub $(TARGET).elf $(TARGET).3dsx $(TARGET).smdh $(TARGET).map $(TARGET).cia banner.bnr icon.icn
+	@rm -rf $(BUILDDIR) stub $(TARGET).elf $(TARGET).3dsx $(TARGET).smdh $(TARGET).map $(TARGET).cia
