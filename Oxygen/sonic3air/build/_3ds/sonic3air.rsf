@@ -56,6 +56,13 @@ AccessControlInfo:
 
   HandleTableSize         : 0x200
 
+  # DSP register windows, needed by libctru's ndsp (audio). Without them the first DSP access faults at 0x1FF5xxxx
+  IORegisterMapping:
+    - 1ff50000-1ff57fff
+    - 1ff70000-1ff77fff
+  MemoryMapping:
+    - 1f000000-1f5fffff:r
+
   # Kernel calls the app is allowed to use (name: number)
   SystemCallAccess:
     ArbitrateAddress: 34
