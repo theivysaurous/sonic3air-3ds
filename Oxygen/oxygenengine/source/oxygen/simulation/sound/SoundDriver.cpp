@@ -3482,7 +3482,7 @@ private:
 	}
 
 private:
-	#pragma pack(1)
+	#pragma pack(push, 1)
 	struct zTrack
 	{
 		// Playback control bits:
@@ -3574,6 +3574,7 @@ private:
 		uint8 VoicesHigh;			// S&K: 2Bh		; High byte of pointer to track's voices, used only if zUpdatingSFX is set
 		uint32 Stack_top;			// S&K: 2Ch-2Fh	; Track stack; can be used by LoopCounters
 	};
+	#pragma pack(pop)
 
 private:
 	uint8 mRegisters[0x20] = { 0 };
