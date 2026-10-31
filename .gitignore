@@ -104,3 +104,8 @@ framework/external/ogg-vorbis/libvorbis/xcode/vorbis.xcodeproj/xcuserdata
 Oxygen/sonic3air/build/_xcode/build/XCBuildData
 Oxygen/sonic3air/build/_xcode/build/sonic3air.build
 framework/external/sdl/SDL2/Xcode/SDL/build/SDL.build
+
+# Never commit game ROMs or generated SD card output
+*.bin.rom
+Oxygen/sonic3air/build/_3ds/Sonic_Knuckles_wSonic3.bin
+Oxygen/sonic3air/build/_3ds/sdcard/

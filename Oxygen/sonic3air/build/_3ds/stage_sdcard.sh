@@ -42,6 +42,14 @@ if [ -f "$HERE/scripts.bin" ]; then
 	echo "Included precompiled scripts.bin"
 fi
 
+# Optional: your own ROM. Put "Sonic_Knuckles_wSonic3.bin" next to this script and it gets copied to /3ds/sonic3air/ (never commit it)
+if [ -f "$HERE/Sonic_Knuckles_wSonic3.bin" ]; then
+	cp "$HERE/Sonic_Knuckles_wSonic3.bin" "$DEST/"
+	echo "Included Sonic_Knuckles_wSonic3.bin"
+else
+	echo "NOTE: Sonic_Knuckles_wSonic3.bin not found next to this script - copy your ROM to /3ds/sonic3air/ on the SD card yourself"
+fi
+
 # Optional: the installable .cia (built with 'make cia'), goes into a "cias" folder
 if [ -f "$HERE/sonic3air.cia" ]; then
 	mkdir -p "$OUT/cias"
