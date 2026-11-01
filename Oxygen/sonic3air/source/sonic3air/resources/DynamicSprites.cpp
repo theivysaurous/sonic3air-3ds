@@ -207,8 +207,14 @@ void DynamicSprites::updateSpriteRedirects()
 			spriteCollection.setupRedirect(INPUT_ICON_BUTTON_RIGHT, GAMEPAD_STYLES[style].mSpriteKeys[3]);
 			spriteCollection.setupRedirect(INPUT_ICON_BUTTON_A,     GAMEPAD_STYLES[style].mSpriteKeys[4]);
 			spriteCollection.setupRedirect(INPUT_ICON_BUTTON_B,     GAMEPAD_STYLES[style].mSpriteKeys[5]);
+		#if defined(PLATFORM_3DS)
+			// X and Y are swapped on the 3DS, see "InputManager"
+			spriteCollection.setupRedirect(INPUT_ICON_BUTTON_X,     GAMEPAD_STYLES[style].mSpriteKeys[7]);
+			spriteCollection.setupRedirect(INPUT_ICON_BUTTON_Y,     GAMEPAD_STYLES[style].mSpriteKeys[6]);
+		#else
 			spriteCollection.setupRedirect(INPUT_ICON_BUTTON_X,     GAMEPAD_STYLES[style].mSpriteKeys[6]);
 			spriteCollection.setupRedirect(INPUT_ICON_BUTTON_Y,     GAMEPAD_STYLES[style].mSpriteKeys[7]);
+		#endif
 			spriteCollection.setupRedirect(INPUT_ICON_BUTTON_START, GAMEPAD_STYLES[style].mSpriteKeys[8]);
 			spriteCollection.setupRedirect(INPUT_ICON_BUTTON_BACK,  GAMEPAD_STYLES[style].mSpriteKeys[9]);
 			spriteCollection.setupRedirect(INPUT_ICON_BUTTON_L,     GAMEPAD_STYLES[style].mSpriteKeys[10]);

@@ -84,3 +84,11 @@ Save data, config and any log files are written inside `/3ds/sonic3air/`.
 
 - The last lines of the build output (for build problems).
 - For runtime problems: what you see on screen, when it happens (boot, ROM load, title screen, in game), and any log file from `/3ds/sonic3air/`.
+
+## Testing and tuning
+
+- **perf.log:** The game appends timing numbers to `/3ds/sonic3air/perf.log` about every 3 seconds (frame time, simulations per second, and the time spent in simulation, audio, rendering, drawing and presenting). If it runs too slowly, send me this file after playing for a minute in a stage and a minute in the menus. Delete it first to start fresh.
+- **video.cfg:** Optional test settings, see `video.cfg.example` (24-bit colour, alpha 0 for the NTR tint test, and turning off the bottom screen image). Copy the example to `/3ds/sonic3air/video.cfg` and edit it.
+- **Bottom screen:** Shows a blurred, dimmed copy of the top screen, updated about three times a second, so it follows the current stage or menu.
+- **Buttons:** On the 3DS, Y is jump (like X on other platforms) and X activates Super Sonic. The button icons in menus use the Switch icon style, whose colours match the 3DS buttons (A red, B yellow, X blue, Y green).
+

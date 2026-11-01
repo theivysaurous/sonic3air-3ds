@@ -1,0 +1,12 @@
+# Optional video test settings for the 3DS build.
+# To use them, copy this file to /3ds/sonic3air/video.cfg on the SD card and remove the "#" in front of the lines you want.
+# Changes need a restart of the game.
+
+# Use 24-bit colour (BGR8) for the top screen instead of 32-bit (RGBA8).
+#format=24
+
+# Write alpha 0 instead of 255 in 32-bit mode (a test for the blue tint in NTR screen streaming).
+#alpha=0
+
+# Turn off the blurred stage/menu image on the bottom screen.
+#bottom=0

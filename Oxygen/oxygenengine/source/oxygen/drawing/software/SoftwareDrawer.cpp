@@ -18,6 +18,195 @@
 #include "oxygen/resources/PaletteCollection.h"
 #include "oxygen/resources/SpriteCollection.h"
 
+#if defined(PLATFORM_3DS)
+	#include <3ds.h>
+#endif
+
+
+#if defined(PLATFORM_3DS)
+namespace softwaredrawer
+{
+	// Direct presenting on the 3DS: One fused pass that converts the intermediate ABGR8888 buffer and writes it, rotated, straight into the 3DS framebuffer
+	//  -> Skips SDL's own surface copy (which was a second full pass with cache-unfriendly writes)
+	//  -> Optional test settings, read from "video.cfg" in the game folder on the SD card:  "format=24" (24-bit BGR8 instead of 32-bit RGBA8),  "alpha=0" (write alpha 0 instead of 255 in 32-bit mode)
+	struct Present3DS
+	{
+		bool mInitialized = false;
+		bool m24Bit = false;
+		bool mAlphaZero = false;
+		bool mBottomScreen = true;		// Show a blurred, dimmed version of the game screen on the bottom screen ("bottom=0" in video.cfg turns it off)
+		int mClearFrames = 3;
+		int mBottomCounter = 0;
+
+		void initialize()
+		{
+			mInitialized = true;
+			FILE* file = fopen("video.cfg", "r");
+			if (nullptr != file)
+			{
+				char line[128];
+				while (fgets(line, sizeof(line), file))
+				{
+					if (strncmp(line, "format=24", 9) == 0)
+						m24Bit = true;
+					else if (strncmp(line, "alpha=0", 7) == 0)
+						mAlphaZero = true;
+					else if (strncmp(line, "bottom=0", 8) == 0)
+						mBottomScreen = false;
+				}
+				fclose(file);
+			}
+			if (m24Bit)
+				gfxSetScreenFormat(GFX_TOP, GSP_BGR8_OES);
+		}
+
+		void present(const Bitmap& source)
+		{
+			if (!mInitialized)
+				initialize();
+
+			u16 fbWidth = 0, fbHeight = 0;		// 240 x 400 for the top screen (the framebuffer is stored rotated)
+			u8* fb = gfxGetFramebuffer(GFX_TOP, GFX_LEFT, &fbWidth, &fbHeight);
+			const int bytesPerPixel = m24Bit ? 3 : 4;
+			const u32 fbSize = (u32)fbWidth * fbHeight * bytesPerPixel;
+			if (mClearFrames > 0)
+			{
+				// Both buffers need to be cleared once, in case a format switch left old data in the unused rows
+				memset(fb, 0, fbSize);
+				--mClearFrames;
+			}
+
+			const int width = std::min<int>(source.getWidth(), fbHeight);
+			const int height = std::min<int>(source.getHeight(), fbWidth);
+			const int column = fbWidth;
+			const uint32 alphaMask = mAlphaZero ? 0xffffff00u : 0xffffffffu;
+
+			// Work in tiles of 8 columns, so that each source cache line is used fully and the destination lines stay in the cache
+			for (int x0 = 0; x0 < width; x0 += 8)
+			{
+				const int n = std::min(8, width - x0);
+				for (int y = 0; y < height; ++y)
+				{
+					const uint32* src = source.getPixelPointer(x0, y);
+					const int dstIndex = x0 * column + (column - 1 - y);
+					if (m24Bit)
+					{
+						u8* dst = fb + (size_t)dstIndex * 3;
+						for (int i = 0; i < n; ++i)
+						{
+							const uint32 c = src[i];
+							dst[0] = (u8)(c >> 16);		// B
+							dst[1] = (u8)(c >> 8);		// G
+							dst[2] = (u8)c;				// R
+							dst += column * 3;
+						}
+					}
+					else
+					{
+						uint32* dst = (uint32*)fb + dstIndex;
+						for (int i = 0; i < n; ++i)
+						{
+							dst[i * column] = __builtin_bswap32(src[i]) & alphaMask;
+						}
+					}
+				}
+			}
+
+			GSPGPU_FlushDataCache(fb, fbSize);
+			gfxScreenSwapBuffers(GFX_TOP, false);
+
+			updateBottomScreen(source);
+		}
+
+		// Bottom screen: A soft, dimmed copy of what's on the top screen, so it reflects the current stage or menu
+		//  -> Updated only every few frames; the source gets averaged into 40x30 blocks, which are then smoothly scaled up to 320x240
+		void updateBottomScreen(const Bitmap& source)
+		{
+			if (!mBottomScreen || ++mBottomCounter < 20)
+				return;
+			mBottomCounter = 0;
+
+			const int srcWidth = source.getWidth();
+			const int srcHeight = source.getHeight();
+			if (srcWidth < 40 || srcHeight < 30)
+				return;
+
+			int blocks[30][40][3];
+			const int blockW = srcWidth / 40;
+			const int blockH = srcHeight / 30;
+			const int step = 2;		// Only look at every second pixel in each direction
+			for (int by = 0; by < 30; ++by)
+			{
+				for (int bx = 0; bx < 40; ++bx)
+				{
+					int sumR = 0, sumG = 0, sumB = 0, count = 0;
+					for (int y = by * blockH; y < (by + 1) * blockH; y += step)
+					{
+						const uint32* row = source.getPixelPointer(bx * blockW, y);
+						for (int x = 0; x < blockW; x += step)
+						{
+							const uint32 c = row[x];
+							sumR += c & 0xff;
+							sumG += (c >> 8) & 0xff;
+							sumB += (c >> 16) & 0xff;
+							++count;
+						}
+					}
+					// Dim to about 60%
+					blocks[by][bx][0] = sumR * 154 / (count * 256);
+					blocks[by][bx][1] = sumG * 154 / (count * 256);
+					blocks[by][bx][2] = sumB * 154 / (count * 256);
+				}
+			}
+
+			u16 fbWidth = 0, fbHeight = 0;		// 240 x 320 for the bottom screen
+			u8* fb = gfxGetFramebuffer(GFX_BOTTOM, GFX_LEFT, &fbWidth, &fbHeight);
+			if (gfxGetScreenFormat(GFX_BOTTOM) != GSP_RGBA8_OES || fbWidth != 240 || fbHeight != 320)
+				return;
+			uint32* dst = (uint32*)fb;
+
+			// Calculate one color per 2x2 output pixels (that's smooth enough for a blurred image, and 4x cheaper)
+			for (int x2 = 0; x2 < 160; ++x2)
+			{
+				// Horizontal interpolation position in 1/16 block units (each block is 8 output pixels wide), taken at the center of the 2x2 output pixels
+				const int px = x2 * 4 - 6;
+				int bx0 = px >> 4;
+				const int fx = px & 15;
+				int bx1 = bx0 + 1;
+				bx0 = std::max(0, std::min(39, bx0));
+				bx1 = std::max(0, std::min(39, bx1));
+				for (int y2 = 0; y2 < 120; ++y2)
+				{
+					const int py = y2 * 4 - 6;
+					int by0 = py >> 4;
+					const int fy = py & 15;
+					int by1 = by0 + 1;
+					by0 = std::max(0, std::min(29, by0));
+					by1 = std::max(0, std::min(29, by1));
+
+					uint32 channel[3];
+					for (int k = 0; k < 3; ++k)
+					{
+						const int top    = blocks[by0][bx0][k] * (16 - fx) + blocks[by0][bx1][k] * fx;
+						const int bottom = blocks[by1][bx0][k] * (16 - fx) + blocks[by1][bx1][k] * fx;
+						channel[k] = (uint32)((top * (16 - fy) + bottom * fy) >> 8);
+					}
+					const uint32 color = (channel[0] << 24) | (channel[1] << 16) | (channel[2] << 8) | 0xff;
+					uint32* d = dst + (x2 * 2) * 240 + (239 - y2 * 2);
+					d[0] = color;			// (x, y)
+					d[-1] = color;			// (x, y+1)
+					d[240] = color;			// (x+1, y)
+					d[239] = color;			// (x+1, y+1)
+				}
+			}
+
+			GSPGPU_FlushDataCache(fb, 240 * 320 * 4);
+			gfxScreenSwapBuffers(GFX_BOTTOM, false);
+		}
+	};
+}
+#endif
+
 
 namespace softwaredrawer
 {
@@ -317,6 +506,13 @@ namespace softwaredrawer
 		{
 			if (nullptr != mScreenSurface && mIsScreenSurfaceLocked)
 			{
+			#if defined(PLATFORM_3DS)
+				if (mSurfaceReverseBytes)
+				{
+					// Nothing to do here, the intermediate buffer gets converted and written to the 3DS framebuffer in one go when presenting
+				}
+				else
+			#endif
 				if (mSurfaceReverseBytes)
 				{
 					// Convert from ABGR8888 (intermediate buffer) to RGBA8888 (SDL surface)
@@ -489,6 +685,9 @@ namespace softwaredrawer
 		bool mSurfaceSwapRedBlue = false;
 		bool mSurfaceReverseBytes = false;		// True if the surface is RGBA8888 and we need an intermediate buffer in ABGR8888
 		Bitmap mIntermediateBuffer;
+	#if defined(PLATFORM_3DS)
+		Present3DS mPresent3DS;
+	#endif
 
 		BlendMode mCurrentBlendMode = BlendMode::OPAQUE;
 		SamplingMode mCurrentSamplingMode = SamplingMode::POINT;
@@ -790,6 +989,13 @@ void SoftwareDrawer::presentScreen()
 		return;
 
 	mInternal.unlockScreenSurface();
+#if defined(PLATFORM_3DS)
+	if (mInternal.mSurfaceReverseBytes)
+	{
+		mInternal.mPresent3DS.present(mInternal.mIntermediateBuffer);
+		return;
+	}
+#endif
 	SDL_UpdateWindowSurface(mInternal.mOutputWindow);
 }
 

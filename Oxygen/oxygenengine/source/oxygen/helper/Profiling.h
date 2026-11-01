@@ -21,7 +21,10 @@ namespace ProfilingRegion
 		SIMULATION_USER_CALL,
 		AUDIO,
 		RENDERING,
-		FRAMESYNC
+		GUI_RENDER,
+		DRAW_EXEC,
+		FRAMESYNC,
+		PRESENT
 	};
 }
 

@@ -42,6 +42,13 @@ if [ -f "$HERE/scripts.bin" ]; then
 	echo "Included precompiled scripts.bin"
 fi
 
+# Optional video test settings (see the file for what they do), copied as an example only
+cp "$HERE/video.cfg.example" "$DEST/video.cfg.example"
+if [ -f "$HERE/video.cfg" ]; then
+	cp "$HERE/video.cfg" "$DEST/video.cfg"
+	echo "Included video.cfg"
+fi
+
 # Optional: your own ROM. Put "Sonic_Knuckles_wSonic3.bin" next to this script and it gets copied to /3ds/sonic3air/ (never commit it)
 if [ -f "$HERE/Sonic_Knuckles_wSonic3.bin" ]; then
 	cp "$HERE/Sonic_Knuckles_wSonic3.bin" "$DEST/"

@@ -65,7 +65,10 @@ Application::Application() :
 	Profiling::registerRegion(ProfilingRegion::SIMULATION_USER_CALL, "User Calls",	Color(0.7f, 0.7f, 0.0f));
 	Profiling::registerRegion(ProfilingRegion::AUDIO,				 "Audio",		Color::RED);
 	Profiling::registerRegion(ProfilingRegion::RENDERING,			 "Rendering",	Color::BLUE);
+	Profiling::registerRegion(ProfilingRegion::GUI_RENDER,			 "Gui Render",	Color(0.3f, 0.3f, 1.0f));
+	Profiling::registerRegion(ProfilingRegion::DRAW_EXEC,			 "Draw Exec",	Color(0.0f, 0.0f, 0.6f));
 	Profiling::registerRegion(ProfilingRegion::FRAMESYNC,			 "Frame Sync",	Color(0.3f, 0.3f, 0.3f));
+	Profiling::registerRegion(ProfilingRegion::PRESENT,				 "Present",		Color(0.5f, 0.5f, 0.5f));
 
 	mApplicationTimer.start();
 }
@@ -663,7 +666,9 @@ void Application::render()
 	}
 	else
 	{
+		Profiling::pushRegion(ProfilingRegion::GUI_RENDER);
 		GuiBase::render();
+		Profiling::popRegion(ProfilingRegion::GUI_RENDER);
 
 		// TODO: This gets called too late
 		mBackdropView->setGameViewRect(mGameView->getGameViewportRect());
@@ -709,7 +714,9 @@ void Application::render()
 		}
 	}
 
+	Profiling::pushRegion(ProfilingRegion::DRAW_EXEC);
 	drawer.performRendering();
+	Profiling::popRegion(ProfilingRegion::DRAW_EXEC);
 
 	mImGuiIntegration.buildContents();
 	mImGuiIntegration.endFrame();
@@ -755,7 +762,9 @@ void Application::render()
 			RMX_LOG_INFO("First present screen call");
 		}
 
+		Profiling::pushRegion(ProfilingRegion::PRESENT);
 		drawer.presentScreen();
+		Profiling::popRegion(ProfilingRegion::PRESENT);
 
 	#if 0
 		// Use a glFinish or glFlush here...?
@@ -772,6 +781,33 @@ void Application::render()
 
 		Profiling::popRegion(ProfilingRegion::FRAMESYNC);
 		Profiling::nextFrame(mSimulation->getFrameNumber());
+
+	#if defined(PLATFORM_3DS)
+		// Write performance numbers to "perf.log" in the game folder on the SD card (about every 3 seconds), to find out where the time goes
+		{
+			static int framesSinceLog = 0;
+			if (++framesSinceLog >= 90)
+			{
+				framesSinceLog = 0;
+				if (FILE* logFile = fopen("perf.log", "a"))
+				{
+					const Profiling::Region& root = Profiling::getRootRegion();
+					fprintf(logFile, "frame=%.1fms (%.1f fps)  sims/s=%.1f |", root.mAverageTime * 1000.0, 1.0 / std::max(0.0001, root.mAverageTime), Profiling::getAdditionalData().mAverageSimulationsPerSecond);
+					std::vector<std::pair<Profiling::Region*, int>> regions;
+					Profiling::listRegionsRecursive(regions);
+					for (const auto& pair : regions)
+					{
+						double maxTime = 0.0;
+						for (const Profiling::Region::Frame& frame : pair.first->mFrameTimes)
+							maxTime = std::max(maxTime, frame.mInclusiveTime);
+						fprintf(logFile, " %s=%.1f(max %.1f)", pair.first->mName.c_str(), pair.first->mAverageTime * 1000.0, maxTime * 1000.0);
+					}
+					fprintf(logFile, "\n");
+					fclose(logFile);
+				}
+			}
+		}
+	#endif
 	}
 
 	if (mIsVeryFirstFrameForLogging)

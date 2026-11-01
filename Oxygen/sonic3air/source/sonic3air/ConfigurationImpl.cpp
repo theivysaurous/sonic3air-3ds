@@ -126,6 +126,10 @@ void ConfigurationImpl::serializeSettingsInternal(JsonSerializer& serializer)
 
 	// Input
 	serializer.serialize("GamepadVisualStyle", mGamepadVisualStyle);
+#if defined(PLATFORM_3DS)
+	// The "Switch" button icon style has the same colors as the 3DS buttons (A red, B yellow, X blue, Y green)
+	mGamepadVisualStyle = 2;
+#endif
 
 	// Game simulation
 	serializer.serialize("SimulationFrequency", mSimulationFrequency);

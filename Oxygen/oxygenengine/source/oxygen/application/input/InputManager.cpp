@@ -235,8 +235,16 @@ namespace
 			bindings[(size_t)Button::RIGHT].emplace_back(SDL_GameControllerGetBindForButton(&gameController, SDL_CONTROLLER_BUTTON_DPAD_RIGHT));
 			bindings[(size_t)Button::A]    .emplace_back(SDL_GameControllerGetBindForButton(&gameController, SDL_CONTROLLER_BUTTON_A));
 			bindings[(size_t)Button::B]    .emplace_back(SDL_GameControllerGetBindForButton(&gameController, SDL_CONTROLLER_BUTTON_B));
+		#if defined(PLATFORM_3DS)
+			// On the 3DS, the roles of X and Y are swapped (the matching button icons get swapped in "DynamicSprites"):
+			//  - Y is the jump button (the game's "X" control, which resembles button C on the Genesis pad)
+			//  - X activates Super Sonic and has the other "Y" functions
+			bindings[(size_t)Button::X]    .emplace_back(SDL_GameControllerGetBindForButton(&gameController, SDL_CONTROLLER_BUTTON_Y));
+			bindings[(size_t)Button::Y]    .emplace_back(SDL_GameControllerGetBindForButton(&gameController, SDL_CONTROLLER_BUTTON_X));
+		#else
 			bindings[(size_t)Button::X]    .emplace_back(SDL_GameControllerGetBindForButton(&gameController, SDL_CONTROLLER_BUTTON_X));
 			bindings[(size_t)Button::Y]    .emplace_back(SDL_GameControllerGetBindForButton(&gameController, SDL_CONTROLLER_BUTTON_Y));
+		#endif
 			bindings[(size_t)Button::START].emplace_back(SDL_GameControllerGetBindForButton(&gameController, SDL_CONTROLLER_BUTTON_START));
 			bindings[(size_t)Button::START].emplace_back(SDL_GameControllerGetBindForButton(&gameController, SDL_CONTROLLER_BUTTON_GUIDE));
 			bindings[(size_t)Button::BACK] .emplace_back(SDL_GameControllerGetBindForButton(&gameController, SDL_CONTROLLER_BUTTON_BACK));
