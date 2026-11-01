@@ -27,6 +27,13 @@ public:
 	static constexpr int8 RENDERER_TYPE_ID = 0x10;
 
 public:
+	// Optional capture of the game screen right after the background layer (plane B) got rendered, before any other layer
+	//  -> Used on the 3DS to show the scrolling background on the bottom screen at almost no extra cost
+	static inline bool sCaptureBackground = false;
+	static inline Bitmap sBackgroundSnapshot;
+	static inline uint32 sBackgroundSnapshotCounter = 0;		// Gets increased with each captured frame
+
+public:
 	SoftwareRenderer(RenderParts& renderParts, DrawerTexture& outputTexture);
 
 	virtual void initialize() override;

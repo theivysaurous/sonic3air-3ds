@@ -11,6 +11,7 @@
 #include "oxygen/drawing/software/SoftwareDrawerTexture.h"
 #include "oxygen/drawing/software/SoftwareRasterizer.h"
 #include "oxygen/drawing/software/Blitter.h"
+#include "oxygen/rendering/software/SoftwareRenderer.h"
 #include "oxygen/drawing/DrawCollection.h"
 #include "oxygen/drawing/DrawCommand.h"
 #include "oxygen/engine/EngineMain.h"
@@ -34,6 +35,11 @@ namespace softwaredrawer
 		bool mInitialized = false;
 		bool m24Bit = false;
 		bool mAlphaZero = false;
+		bool mBottomBackground = false;	// "bottom=background": Show the scrolling background layer (plane B) of the game on the bottom screen
+		int mBottomRate = 2;			// "bottom_rate=N": Update the background image on every N-th frame
+		int mBackgroundCounter = 0;
+		uint32 mLastSnapshotCounter = 0;
+		int mFramesSinceSnapshot = 1000;
 		bool mBottomScreen = true;		// Show a blurred, dimmed version of the game screen on the bottom screen ("bottom=0" in video.cfg turns it off)
 		int mClearFrames = 3;
 		int mBottomCounter = 0;
@@ -53,11 +59,17 @@ namespace softwaredrawer
 						mAlphaZero = true;
 					else if (strncmp(line, "bottom=0", 8) == 0)
 						mBottomScreen = false;
+					else if (strncmp(line, "bottom=background", 17) == 0)
+						mBottomBackground = true;
+					else if (strncmp(line, "bottom_rate=", 12) == 0)
+						mBottomRate = std::max(1, std::min(10, atoi(line + 12)));
 				}
 				fclose(file);
 			}
 			if (m24Bit)
 				gfxSetScreenFormat(GFX_TOP, GSP_BGR8_OES);
+			if (mBottomBackground)
+				SoftwareRenderer::sCaptureBackground = true;
 		}
 
 		void present(const Bitmap& source)
@@ -118,11 +130,76 @@ namespace softwaredrawer
 			updateBottomScreen(source);
 		}
 
+
+		// Bottom screen, background mode: The background layer as captured by the renderer, scaled to the bottom screen's height, with the sides cropped
+		void drawBottomBackground(const Bitmap& background)
+		{
+			u16 fbWidth = 0, fbHeight = 0;		// 240 x 320 for the bottom screen
+			u8* fb = gfxGetFramebuffer(GFX_BOTTOM, GFX_LEFT, &fbWidth, &fbHeight);
+			if (gfxGetScreenFormat(GFX_BOTTOM) != GSP_RGBA8_OES || fbWidth != 240 || fbHeight != 320)
+				return;
+
+			const int srcWidth = background.getWidth();
+			const int srcHeight = background.getHeight();
+			if (srcWidth < 16 || srcHeight < 16)
+				return;
+
+			int sourceX[320];
+			int sourceY[240];
+			const int visibleWidth = std::min(srcWidth, 320 * srcHeight / 240);
+			const int cropX = (srcWidth - visibleWidth) / 2;
+			for (int x = 0; x < 320; ++x)
+				sourceX[x] = cropX + x * visibleWidth / 320;
+			for (int y = 0; y < 240; ++y)
+				sourceY[y] = y * srcHeight / 240;
+
+			uint32* dst = (uint32*)fb;
+			for (int x = 0; x < 320; ++x)
+			{
+				uint32* column = dst + x * 240 + 239;
+				const uint32* srcColumn = background.getPixelPointer(sourceX[x], 0);
+				for (int y = 0; y < 240; ++y)
+				{
+					column[-y] = __builtin_bswap32(srcColumn[sourceY[y] * srcWidth]);
+				}
+			}
+
+			GSPGPU_FlushDataCache(fb, 240 * 320 * 4);
+			gfxScreenSwapBuffers(GFX_BOTTOM, false);
+		}
+
 		// Bottom screen: A soft, dimmed copy of what's on the top screen, so it reflects the current stage or menu
 		//  -> Updated only every few frames; the source gets averaged into 40x30 blocks, which are then smoothly scaled up to 320x240
 		void updateBottomScreen(const Bitmap& source)
 		{
-			if (!mBottomScreen || ++mBottomCounter < 20)
+			if (!mBottomScreen)
+				return;
+
+			if (mBottomBackground)
+			{
+				// Use the background layer if the renderer is currently producing one, otherwise (menus) fall back to the blurred copy below
+				if (SoftwareRenderer::sBackgroundSnapshotCounter != mLastSnapshotCounter)
+				{
+					mLastSnapshotCounter = SoftwareRenderer::sBackgroundSnapshotCounter;
+					mFramesSinceSnapshot = 0;
+				}
+				else
+				{
+					++mFramesSinceSnapshot;
+				}
+
+				if (mFramesSinceSnapshot < 4)
+				{
+					if (++mBackgroundCounter >= mBottomRate)
+					{
+						mBackgroundCounter = 0;
+						drawBottomBackground(SoftwareRenderer::sBackgroundSnapshot);
+					}
+					return;
+				}
+			}
+
+			if (++mBottomCounter < 20)
 				return;
 			mBottomCounter = 0;
 

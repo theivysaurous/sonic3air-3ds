@@ -173,6 +173,8 @@ void SoftwareRenderer::renderGameScreen(const std::vector<Geometry*>& geometries
 	const bool usingSpriteMask = isUsingSpriteMask(geometries);
 
 	// Render geometries
+	bool renderedPlaneB = false;
+	bool capturedBackground = false;
 	{
 		uint16 lastRenderQueue = 0xffff;
 		for (size_t i = 0; i < geometries.size(); ++i)
@@ -187,9 +189,24 @@ void SoftwareRenderer::renderGameScreen(const std::vector<Geometry*>& geometries
 				mGameScreenCopy = gameScreenBitmap;
 			}
 
+			// Capture the background layer: Everything before the first geometry that is not plane B
+			const bool isPlaneB = (geometries[i]->getType() == Geometry::Type::PLANE && static_cast<const PlaneGeometry*>(geometries[i])->mPlaneIndex == 0);
+			if (sCaptureBackground && renderedPlaneB && !capturedBackground && !isPlaneB)
+			{
+				sBackgroundSnapshot = gameScreenBitmap;
+				++sBackgroundSnapshotCounter;
+				capturedBackground = true;
+			}
+			renderedPlaneB |= isPlaneB;
+
 			renderGeometry(*geometries[i]);
 			lastRenderQueue = renderQueue;
 		}
+	}
+	if (sCaptureBackground && renderedPlaneB && !capturedBackground)
+	{
+		sBackgroundSnapshot = gameScreenBitmap;
+		++sBackgroundSnapshotCounter;
 	}
 
 	// Set alpha channel to 0xff to make sure nothing gets lost due to alpha test

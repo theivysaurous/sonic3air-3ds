@@ -10,3 +10,11 @@
 
 # Turn off the blurred stage/menu image on the bottom screen.
 #bottom=0
+
+# Show the game's scrolling background layer (without sprites, foreground or HUD) on the bottom screen, in sync with the top screen.
+# In menus, where there is no such layer, it falls back to the blurred picture.
+#bottom=background
+
+# How often the background image is updated: every N-th frame (default 2 = 30 times per second, 1 = every frame, up to 10). Higher is faster.
+#bottom_rate=2
+
