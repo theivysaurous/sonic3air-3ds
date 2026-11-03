@@ -488,6 +488,9 @@ function void DataSelect.update()
 function void DataSelectScreen()
 {
 	FadeOutScreenBlocking()
+#if GAMEAPP
+	Game.setBottomScreen(6)		// Nintendo 3DS: Bottom screen shows dataselect_bg.png
+#endif
 
 #if STANDALONE
 	InitSaveSlots()

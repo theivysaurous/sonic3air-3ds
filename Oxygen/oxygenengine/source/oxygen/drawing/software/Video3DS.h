@@ -97,6 +97,7 @@ struct Video3DS
 	// Set by the presenter: The renderer should capture the background layer in the frame it's about to render
 	static inline bool sCaptureBackground = false;
 	static inline bool sCaptureAllPlanes = true;				// Capture all planes (the level without sprites), not only plane B; avoids showing parts of plane B that are normally covered by plane A
+	static inline bool sCaptureNoPlanes = false;				// Capture only the background sprites, no planes (title screen: the background without Sonic, who is on a plane)
 	static inline bool sCaptureBackgroundSprites = false;		// Also capture everything below the first game layer (render queue < 0x2000), e.g. the background image of the title screen
 
 	static void setBottomSolid(uint32 colorABGR)
@@ -129,6 +130,7 @@ struct Video3DS
 		sBottomMode = BottomMode::BACKGROUND;
 		sCaptureAllPlanes = config().mBottomScene;
 		sCaptureBackgroundSprites = false;
+		sCaptureNoPlanes = false;
 	}
 
 	// Title screen and main menu: The whole scene without sprites, including custom background sprites
@@ -137,6 +139,16 @@ struct Video3DS
 		sBottomMode = BottomMode::BACKGROUND;
 		sCaptureAllPlanes = true;
 		sCaptureBackgroundSprites = true;
+		sCaptureNoPlanes = false;
+	}
+
+	// Title screen: Only the background sprites (sky and ocean), without Sonic and the logo
+	static void setBottomTitleBackground()
+	{
+		sBottomMode = BottomMode::BACKGROUND;
+		sCaptureAllPlanes = false;
+		sCaptureBackgroundSprites = true;
+		sCaptureNoPlanes = true;
 	}
 
 	// Used by scripts via "Game.setBottomScreen"
@@ -146,7 +158,9 @@ struct Video3DS
 		SCRIPT_SCENE   = 1,
 		SCRIPT_WHITE   = 2,
 		SCRIPT_BLACK   = 3,
-		SCRIPT_FOLLOW  = 4		// One color that follows the color in the top left corner of the top screen, e.g. during fades
+		SCRIPT_FOLLOW  = 4,		// One color that follows the color in the top left corner of the top screen, e.g. during fades
+		SCRIPT_TITLE   = 5,		// Title screen background without Sonic
+		SCRIPT_DATASELECT = 6	// Fixed image: "dataselect_bg.png" (set by the game code)
 	};
 
 	static void setBottomFromScript(int mode)
@@ -159,6 +173,7 @@ struct Video3DS
 			case SCRIPT_WHITE:    setBottomSolid(0xffffffff);  break;
 			case SCRIPT_BLACK:    setBottomSolid(0xff000000);  break;
 			case SCRIPT_FOLLOW:   setBottomSolidFollowingScreen();  break;
+			case SCRIPT_TITLE:    setBottomTitleBackground();  break;
 		}
 	}
 };

@@ -324,6 +324,10 @@ function void fn04fbea()
 	{
 		u16[0xffffeec6] = 0
 
+	#if GAMEAPP
+		Game.setBottomScreen(1)		// Nintendo 3DS: The fire wall is not on the background layer, so show all layers on the bottom screen until it is gone
+	#endif
+
 		// Set fire wall palette
 		A1 = 0xfffffc62
 		u32[A1]   = 0x004e006e
@@ -849,6 +853,9 @@ function void fn0500d6()
 function void fn0500da()
 {
 	// Post-initialization when fire wall has just disappeared
+#if GAMEAPP
+	Game.setBottomScreen(0)		// Nintendo 3DS: Back to the background layer on the bottom screen
+#endif
 	fn0501fe()
 }
 

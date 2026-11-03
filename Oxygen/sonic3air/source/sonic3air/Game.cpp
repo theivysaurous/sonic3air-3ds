@@ -881,7 +881,10 @@ void Game::setBottomScreen(uint8 mode)
 {
 	// What to show on the bottom screen of the Nintendo 3DS (0 = level background, 1 = scene without sprites, 2 = white, 3 = black, 4 = follow the top screen's color); ignored on other platforms
 #if defined(PLATFORM_3DS)
-	Video3DS::setBottomFromScript(mode);
+	if (mode == Video3DS::SCRIPT_DATASELECT)
+		Video3DS::setBottomImage(&global::mDataSelectBackground.getBitmap());
+	else
+		Video3DS::setBottomFromScript(mode);
 #endif
 }
 

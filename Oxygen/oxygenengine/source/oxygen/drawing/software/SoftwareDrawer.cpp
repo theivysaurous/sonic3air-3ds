@@ -45,6 +45,13 @@ namespace softwaredrawer
 		uint32 mLastSnapshotCounter = 0;
 		int mFramesSinceSnapshot = 0;
 		bool mBottomDrawn = false;
+
+		// Smooth fade when the background changes abruptly (palette swaps, e.g. in Mushroom Hill): The new image gets the old average colour added, which fades out
+		bool mHasMean = false;
+		int mMean[3] = { 0, 0, 0 };				// Average colour (R, G, B) of the last captured background, without fade offset
+		int mFadeStart[3] = { 0, 0, 0 };
+		int mFadeLeft = 0;
+		static constexpr int FADE_STEPS = 12;	// In bottom screen updates
 		Video3DS::BottomMode mLastBottomMode = Video3DS::BottomMode::BACKGROUND;
 		uint32 mLastSolidColor = 0;
 		const Bitmap* mLastImage = nullptr;
@@ -190,7 +197,7 @@ namespace softwaredrawer
 		}
 
 		// Draws an image on the bottom screen: scaled to the screen's height, with the sides cropped (so the aspect ratio is kept)
-		void drawBottomBitmap(const Bitmap& image)
+		void drawBottomBitmap(const Bitmap& image, const int* offset = nullptr)
 		{
 			const int srcWidth = image.getWidth();
 			const int srcHeight = image.getHeight();
@@ -210,6 +217,20 @@ namespace softwaredrawer
 			for (int y = 0; y < 240; ++y)
 				sourceY[y] = y * srcHeight / 240;
 
+			const bool adjust = (nullptr != offset) && (offset[0] != 0 || offset[1] != 0 || offset[2] != 0);
+			const int offR = adjust ? offset[0] : 0;
+			const int offG = adjust ? offset[1] : 0;
+			const int offB = adjust ? offset[2] : 0;
+			auto adjustColor = [&](uint32 c) -> uint32
+			{
+				if (!adjust)
+					return c;
+				const int r = std::max(0, std::min(255, (int)(c & 0xff) + offR));
+				const int g = std::max(0, std::min(255, (int)((c >> 8) & 0xff) + offG));
+				const int b = std::max(0, std::min(255, (int)((c >> 16) & 0xff) + offB));
+				return 0xff000000u | (uint32)r | ((uint32)g << 8) | ((uint32)b << 16);
+			};
+
 			// Tiles of 8 columns again; reads go along the source rows (cache friendly), writes stay in a few cache lines
 			for (int x0 = 0; x0 < 320; x0 += 8)
 			{
@@ -222,7 +243,7 @@ namespace softwaredrawer
 						u8* dst = fb + dstIndex * 3;
 						for (int i = 0; i < 8; ++i)
 						{
-							const uint32 c = srcRow[sourceX[x0 + i]];
+							const uint32 c = adjustColor(srcRow[sourceX[x0 + i]]);
 							dst[0] = (u8)(c >> 16);
 							dst[1] = (u8)(c >> 8);
 							dst[2] = (u8)c;
@@ -234,12 +255,65 @@ namespace softwaredrawer
 						uint32* dst = (uint32*)fb + dstIndex;
 						for (int i = 0; i < 8; ++i)
 						{
-							dst[i * 240] = __builtin_bswap32(srcRow[sourceX[x0 + i]] | 0xff000000u);
+							dst[i * 240] = __builtin_bswap32(adjustColor(srcRow[sourceX[x0 + i]]) | 0xff000000u);
 						}
 					}
 				}
 			}
 			finishBottom(fb);
+		}
+
+		// Draws the captured background; if its average colour jumped compared to the last one (palette swap), fades from the old colour impression to the new one
+		void drawSnapshotWithFade(const Bitmap& image)
+		{
+			int mean[3] = { 0, 0, 0 };
+			const int w = image.getWidth();
+			const int h = image.getHeight();
+			if (w < 16 || h < 16)
+				return;
+			int count = 0;
+			for (int y = 4; y < h; y += 16)
+			{
+				const uint32* row = image.getPixelPointer(0, y);
+				for (int x = 4; x < w; x += 16)
+				{
+					const uint32 c = row[x];
+					mean[0] += (int)(c & 0xff);
+					mean[1] += (int)((c >> 8) & 0xff);
+					mean[2] += (int)((c >> 16) & 0xff);
+					++count;
+				}
+			}
+			for (int k = 0; k < 3; ++k)
+				mean[k] /= std::max(count, 1);
+
+			if (mHasMean)
+			{
+				// What the screen currently shows (previous average plus the remaining fade offset)
+				int shown[3];
+				for (int k = 0; k < 3; ++k)
+					shown[k] = mMean[k] + mFadeStart[k] * mFadeLeft / FADE_STEPS;
+
+				const int diff = std::abs(shown[0] - mean[0]) + std::abs(shown[1] - mean[1]) + std::abs(shown[2] - mean[2]);
+				if (diff > 60 && mFadeLeft == 0)
+				{
+					for (int k = 0; k < 3; ++k)
+						mFadeStart[k] = shown[k] - mean[k];
+					mFadeLeft = FADE_STEPS;
+				}
+			}
+			mHasMean = true;
+			for (int k = 0; k < 3; ++k)
+				mMean[k] = mean[k];
+
+			int offset[3] = { 0, 0, 0 };
+			if (mFadeLeft > 0)
+			{
+				for (int k = 0; k < 3; ++k)
+					offset[k] = mFadeStart[k] * mFadeLeft / FADE_STEPS;
+				--mFadeLeft;
+			}
+			drawBottomBitmap(image, offset);
 		}
 
 		void updateBottomScreen(const Bitmap& source)
@@ -265,7 +339,11 @@ namespace softwaredrawer
 			const Video3DS::BottomMode mode = Video3DS::sBottomMode;
 			bool capture = false;
 			if (mode != Video3DS::BottomMode::BACKGROUND)
+			{
 				mFramesSinceSnapshot = 0;
+				mHasMean = false;
+				mFadeLeft = 0;
+			}
 
 			switch (mode)
 			{
@@ -303,7 +381,7 @@ namespace softwaredrawer
 						// The renderer captured the background layer in this frame
 						mLastSnapshotCounter = SoftwareRenderer::sBackgroundSnapshotCounter;
 						mFramesSinceSnapshot = 0;
-						drawBottomBitmap(SoftwareRenderer::sBackgroundSnapshot);
+						drawSnapshotWithFade(SoftwareRenderer::sBackgroundSnapshot);
 						mLastBottomMode = mode;
 					}
 					else if (++mFramesSinceSnapshot > 30 && (mLastBottomMode != Video3DS::BottomMode::SOLID || mLastSolidColor != 0xff000000u))

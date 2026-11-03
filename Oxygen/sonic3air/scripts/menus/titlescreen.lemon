@@ -423,7 +423,7 @@ function void TitleScreen()
 	Renderer.drawCustomSprite("bg_title_screen", getScreenExtend() - 40, 0, 0x00, 0, 0x1100)
 #endif
 #if GAMEAPP
-	Game.setBottomScreen(1)		// Nintendo 3DS: Bottom screen shows the title screen background
+	Game.setBottomScreen(5)		// Nintendo 3DS: Bottom screen shows the title screen background (without Sonic)
 #endif
 
 	while (true)

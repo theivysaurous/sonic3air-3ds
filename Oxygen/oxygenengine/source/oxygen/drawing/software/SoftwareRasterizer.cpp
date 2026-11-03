@@ -94,7 +94,23 @@ namespace
 		}
 	};
 
-	// Point sampling, no blending, no vertex colors
+	FORCE_INLINE uint32 lerpPacked(uint32 a, uint32 b, uint32 f)		// f in 0..256
+	{
+		const uint32 rb = (((a & 0x00ff00ffu) * (256 - f) + (b & 0x00ff00ffu) * f) >> 8) & 0x00ff00ffu;
+		const uint32 ag = (((a >> 8) & 0x00ff00ffu) * (256 - f) + ((b >> 8) & 0x00ff00ffu) * f) & 0xff00ff00u;
+		return rb | ag;
+	}
+
+	FORCE_INLINE uint32 blendPoint(uint32 dst, uint32 c)
+	{
+		const uint32 alpha = c >> 24;
+		if (alpha == 0xff)  return c;
+		if (alpha == 0)	 return dst;
+		return lerpPacked(dst, c, alpha + (alpha >> 7)) | 0xff000000u;
+	}
+
+	// Point sampling, no vertex colors; optionally with alpha blending
+	template<bool ALPHA_BLENDING>
 	bool processPointLineOpaqueFast(uint8* output, int numPixels, const Vec2f& currentUV, const Vec2f& diffUV, const BitmapView<uint32>& texture)
 	{
 		FixedLineSetup line;
@@ -115,7 +131,7 @@ namespace
 					const int n = std::min(remaining, line.mTexW - x);
 					const uint32* src = row + x;
 					for (int i = 0; i < n; ++i)
-						out[i] = src[i] | 0xff000000u;
+						out[i] = ALPHA_BLENDING ? blendPoint(out[i], src[i]) : (src[i] | 0xff000000u);
 					out += n;
 					remaining -= n;
 					x = 0;
@@ -125,7 +141,7 @@ namespace
 			{
 				for (int i = 0; i < numPixels; ++i)
 				{
-					out[i] = row[line.mX >> 16] | 0xff000000u;
+					out[i] = ALPHA_BLENDING ? blendPoint(out[i], row[line.mX >> 16]) : (row[line.mX >> 16] | 0xff000000u);
 					line.mX += line.mDX;
 					if (line.mX >= line.mWrapX)  line.mX -= line.mWrapX;  else if (line.mX < 0)  line.mX += line.mWrapX;
 				}
@@ -135,18 +151,11 @@ namespace
 		{
 			for (int i = 0; i < numPixels; ++i)
 			{
-				out[i] = *texture.getPixelPointer(line.mX >> 16, line.mY >> 16) | 0xff000000u;
+				{ const uint32 c = *texture.getPixelPointer(line.mX >> 16, line.mY >> 16); out[i] = ALPHA_BLENDING ? blendPoint(out[i], c) : (c | 0xff000000u); }
 				line.advance();
 			}
 		}
 		return true;
-	}
-
-	FORCE_INLINE uint32 lerpPacked(uint32 a, uint32 b, uint32 f)		// f in 0..256
-	{
-		const uint32 rb = (((a & 0x00ff00ffu) * (256 - f) + (b & 0x00ff00ffu) * f) >> 8) & 0x00ff00ffu;
-		const uint32 ag = (((a >> 8) & 0x00ff00ffu) * (256 - f) + ((b >> 8) & 0x00ff00ffu) * f) & 0xff00ff00u;
-		return rb | ag;
 	}
 
 	// Bilinear sampling, no vertex colors
@@ -203,9 +212,9 @@ namespace
 				if (processBilinearLineFast<ALPHA_BLENDING>(output, numPixels, currentUV, diffUV, texture))
 					return;
 			}
-			else if constexpr (!ALPHA_BLENDING)
+			else
 			{
-				if (processPointLineOpaqueFast(output, numPixels, currentUV, diffUV, texture))
+				if (processPointLineOpaqueFast<ALPHA_BLENDING>(output, numPixels, currentUV, diffUV, texture))
 					return;
 			}
 		}
