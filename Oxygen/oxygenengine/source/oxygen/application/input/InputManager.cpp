@@ -804,6 +804,19 @@ InputManager::RescanResult InputManager::rescanRealDevices()
 		InputConfig::DeviceDefinition* fallbackInputDeviceDefinition = nullptr;
 		::getMatchingInputDeviceDefinition(device, (uint32)i, config.mInputDeviceDefinitions, matchingInputDeviceDefinition, fallbackInputDeviceDefinition);
 
+	#if defined(PLATFORM_3DS)
+		if (nullptr != matchingInputDeviceDefinition && nullptr != device.mSDLGameController)
+		{
+			// The 3DS has a fixed button layout, with X and Y swapped on purpose (see below)
+			//  -> Always rebuild the mapping instead of using one that an earlier version stored in the settings, or the swap would never take effect
+			::setupRealDeviceInputMapping(device, *device.mSDLGameController);
+			for (size_t controlIndex = 0; controlIndex < device.mControlMappings.size(); ++controlIndex)
+			{
+				matchingInputDeviceDefinition->mMappings[controlIndex].mAssignments = device.mControlMappings[controlIndex].mAssignments;
+			}
+		}
+		else
+	#endif
 		if (nullptr != matchingInputDeviceDefinition)
 		{
 			// Use device definition from config

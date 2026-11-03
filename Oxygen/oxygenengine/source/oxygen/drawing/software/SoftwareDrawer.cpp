@@ -11,6 +11,7 @@
 #include "oxygen/drawing/software/SoftwareDrawerTexture.h"
 #include "oxygen/drawing/software/SoftwareRasterizer.h"
 #include "oxygen/drawing/software/Blitter.h"
+#include "oxygen/drawing/software/Video3DS.h"
 #include "oxygen/rendering/software/SoftwareRenderer.h"
 #include "oxygen/drawing/DrawCollection.h"
 #include "oxygen/drawing/DrawCommand.h"
@@ -29,47 +30,53 @@ namespace softwaredrawer
 {
 	// Direct presenting on the 3DS: One fused pass that converts the intermediate ABGR8888 buffer and writes it, rotated, straight into the 3DS framebuffer
 	//  -> Skips SDL's own surface copy (which was a second full pass with cache-unfriendly writes)
-	//  -> Optional test settings, read from "video.cfg" in the game folder on the SD card:  "format=24" (24-bit BGR8 instead of 32-bit RGBA8),  "alpha=0" (write alpha 0 instead of 255 in 32-bit mode)
+	//  -> Settings come from "video.cfg" in the game folder on the SD card, see "Video3DS.h"
+	//  -> The bottom screen shows either the background layer of the game (updated every few frames), a solid color, or a fixed image
 	struct Present3DS
 	{
 		bool mInitialized = false;
-		bool m24Bit = false;
+		bool m24Bit = true;
 		bool mAlphaZero = false;
-		bool mBottomBackground = false;	// "bottom=background": Show the scrolling background layer (plane B) of the game on the bottom screen
-		int mBottomRate = 2;			// "bottom_rate=N": Update the background image on every N-th frame
-		int mBackgroundCounter = 0;
-		uint32 mLastSnapshotCounter = 0;
-		int mFramesSinceSnapshot = 1000;
-		bool mBottomScreen = true;		// Show a blurred, dimmed version of the game screen on the bottom screen ("bottom=0" in video.cfg turns it off)
 		int mClearFrames = 3;
-		int mBottomCounter = 0;
+
+		// Bottom screen
+		int mBottomClearFrames = 3;
+		int mCaptureCounter = 0;
+		uint32 mLastSnapshotCounter = 0;
+		int mFramesSinceSnapshot = 0;
+		bool mBottomDrawn = false;
+		Video3DS::BottomMode mLastBottomMode = Video3DS::BottomMode::BACKGROUND;
+		uint32 mLastSolidColor = 0;
+		const Bitmap* mLastImage = nullptr;
 
 		void initialize()
 		{
 			mInitialized = true;
-			FILE* file = fopen("video.cfg", "r");
-			if (nullptr != file)
-			{
-				char line[128];
-				while (fgets(line, sizeof(line), file))
-				{
-					if (strncmp(line, "format=24", 9) == 0)
-						m24Bit = true;
-					else if (strncmp(line, "alpha=0", 7) == 0)
-						mAlphaZero = true;
-					else if (strncmp(line, "bottom=0", 8) == 0)
-						mBottomScreen = false;
-					else if (strncmp(line, "bottom=background", 17) == 0)
-						mBottomBackground = true;
-					else if (strncmp(line, "bottom_rate=", 12) == 0)
-						mBottomRate = std::max(1, std::min(10, atoi(line + 12)));
-				}
-				fclose(file);
-			}
+			const Video3DS::Config& config = Video3DS::config();
+			m24Bit = config.m24Bit;
+			mAlphaZero = config.mAlphaZero;
+			Video3DS::setBottomDefault();
 			if (m24Bit)
+			{
+				// 24-bit BGR8 on both screens: Less memory traffic, and tools like NTR that stream the screens decode this format correctly
 				gfxSetScreenFormat(GFX_TOP, GSP_BGR8_OES);
-			if (mBottomBackground)
-				SoftwareRenderer::sCaptureBackground = true;
+				gfxSetScreenFormat(GFX_BOTTOM, GSP_BGR8_OES);
+			}
+		}
+
+		FORCE_INLINE void writePixel(u8* base, size_t index, uint32 abgr) const
+		{
+			if (m24Bit)
+			{
+				u8* dst = base + index * 3;
+				dst[0] = (u8)(abgr >> 16);		// B
+				dst[1] = (u8)(abgr >> 8);		// G
+				dst[2] = (u8)abgr;				// R
+			}
+			else
+			{
+				((uint32*)base)[index] = __builtin_bswap32(abgr | 0xff000000u);
+			}
 		}
 
 		void present(const Bitmap& source)
@@ -131,17 +138,67 @@ namespace softwaredrawer
 		}
 
 
-		// Bottom screen, background mode: The background layer as captured by the renderer, scaled to the bottom screen's height, with the sides cropped
-		void drawBottomBackground(const Bitmap& background)
+		// Returns the bottom framebuffer if it has the expected format and size
+		u8* getBottomFramebuffer()
 		{
 			u16 fbWidth = 0, fbHeight = 0;		// 240 x 320 for the bottom screen
 			u8* fb = gfxGetFramebuffer(GFX_BOTTOM, GFX_LEFT, &fbWidth, &fbHeight);
-			if (gfxGetScreenFormat(GFX_BOTTOM) != GSP_RGBA8_OES || fbWidth != 240 || fbHeight != 320)
+			if (gfxGetScreenFormat(GFX_BOTTOM) != (m24Bit ? GSP_BGR8_OES : GSP_RGBA8_OES) || fbWidth != 240 || fbHeight != 320)
+				return nullptr;
+			return fb;
+		}
+
+		void finishBottom(u8* fb)
+		{
+			GSPGPU_FlushDataCache(fb, 240 * 320 * (m24Bit ? 3 : 4));
+			gfxScreenSwapBuffers(GFX_BOTTOM, false);
+			mBottomDrawn = true;
+		}
+
+		void fillBottom(uint32 abgr)
+		{
+			u8* fb = getBottomFramebuffer();
+			if (nullptr == fb)
 				return;
 
-			const int srcWidth = background.getWidth();
-			const int srcHeight = background.getHeight();
+			const size_t numPixels = 240 * 320;
+			if (m24Bit)
+			{
+				u8 pattern[3] = { (u8)(abgr >> 16), (u8)(abgr >> 8), (u8)abgr };
+				if (pattern[0] == pattern[1] && pattern[1] == pattern[2])
+				{
+					memset(fb, pattern[0], numPixels * 3);
+				}
+				else
+				{
+					for (size_t i = 0; i < numPixels; ++i)
+					{
+						fb[i * 3 + 0] = pattern[0];
+						fb[i * 3 + 1] = pattern[1];
+						fb[i * 3 + 2] = pattern[2];
+					}
+				}
+			}
+			else
+			{
+				const uint32 value = __builtin_bswap32(abgr | 0xff000000u);
+				uint32* dst = (uint32*)fb;
+				for (size_t i = 0; i < numPixels; ++i)
+					dst[i] = value;
+			}
+			finishBottom(fb);
+		}
+
+		// Draws an image on the bottom screen: scaled to the screen's height, with the sides cropped (so the aspect ratio is kept)
+		void drawBottomBitmap(const Bitmap& image)
+		{
+			const int srcWidth = image.getWidth();
+			const int srcHeight = image.getHeight();
 			if (srcWidth < 16 || srcHeight < 16)
+				return;
+
+			u8* fb = getBottomFramebuffer();
+			if (nullptr == fb)
 				return;
 
 			int sourceX[320];
@@ -153,132 +210,120 @@ namespace softwaredrawer
 			for (int y = 0; y < 240; ++y)
 				sourceY[y] = y * srcHeight / 240;
 
-			uint32* dst = (uint32*)fb;
-			for (int x = 0; x < 320; ++x)
+			// Tiles of 8 columns again; reads go along the source rows (cache friendly), writes stay in a few cache lines
+			for (int x0 = 0; x0 < 320; x0 += 8)
 			{
-				uint32* column = dst + x * 240 + 239;
-				const uint32* srcColumn = background.getPixelPointer(sourceX[x], 0);
 				for (int y = 0; y < 240; ++y)
 				{
-					column[-y] = __builtin_bswap32(srcColumn[sourceY[y] * srcWidth]);
-				}
-			}
-
-			GSPGPU_FlushDataCache(fb, 240 * 320 * 4);
-			gfxScreenSwapBuffers(GFX_BOTTOM, false);
-		}
-
-		// Bottom screen: A soft, dimmed copy of what's on the top screen, so it reflects the current stage or menu
-		//  -> Updated only every few frames; the source gets averaged into 40x30 blocks, which are then smoothly scaled up to 320x240
-		void updateBottomScreen(const Bitmap& source)
-		{
-			if (!mBottomScreen)
-				return;
-
-			if (mBottomBackground)
-			{
-				// Use the background layer if the renderer is currently producing one, otherwise (menus) fall back to the blurred copy below
-				if (SoftwareRenderer::sBackgroundSnapshotCounter != mLastSnapshotCounter)
-				{
-					mLastSnapshotCounter = SoftwareRenderer::sBackgroundSnapshotCounter;
-					mFramesSinceSnapshot = 0;
-				}
-				else
-				{
-					++mFramesSinceSnapshot;
-				}
-
-				if (mFramesSinceSnapshot < 4)
-				{
-					if (++mBackgroundCounter >= mBottomRate)
+					const uint32* srcRow = image.getPixelPointer(0, sourceY[y]);
+					const size_t dstIndex = (size_t)x0 * 240 + (239 - y);
+					if (m24Bit)
 					{
-						mBackgroundCounter = 0;
-						drawBottomBackground(SoftwareRenderer::sBackgroundSnapshot);
-					}
-					return;
-				}
-			}
-
-			if (++mBottomCounter < 20)
-				return;
-			mBottomCounter = 0;
-
-			const int srcWidth = source.getWidth();
-			const int srcHeight = source.getHeight();
-			if (srcWidth < 40 || srcHeight < 30)
-				return;
-
-			int blocks[30][40][3];
-			const int blockW = srcWidth / 40;
-			const int blockH = srcHeight / 30;
-			const int step = 2;		// Only look at every second pixel in each direction
-			for (int by = 0; by < 30; ++by)
-			{
-				for (int bx = 0; bx < 40; ++bx)
-				{
-					int sumR = 0, sumG = 0, sumB = 0, count = 0;
-					for (int y = by * blockH; y < (by + 1) * blockH; y += step)
-					{
-						const uint32* row = source.getPixelPointer(bx * blockW, y);
-						for (int x = 0; x < blockW; x += step)
+						u8* dst = fb + dstIndex * 3;
+						for (int i = 0; i < 8; ++i)
 						{
-							const uint32 c = row[x];
-							sumR += c & 0xff;
-							sumG += (c >> 8) & 0xff;
-							sumB += (c >> 16) & 0xff;
-							++count;
+							const uint32 c = srcRow[sourceX[x0 + i]];
+							dst[0] = (u8)(c >> 16);
+							dst[1] = (u8)(c >> 8);
+							dst[2] = (u8)c;
+							dst += 240 * 3;
 						}
 					}
-					// Dim to about 60%
-					blocks[by][bx][0] = sumR * 154 / (count * 256);
-					blocks[by][bx][1] = sumG * 154 / (count * 256);
-					blocks[by][bx][2] = sumB * 154 / (count * 256);
-				}
-			}
-
-			u16 fbWidth = 0, fbHeight = 0;		// 240 x 320 for the bottom screen
-			u8* fb = gfxGetFramebuffer(GFX_BOTTOM, GFX_LEFT, &fbWidth, &fbHeight);
-			if (gfxGetScreenFormat(GFX_BOTTOM) != GSP_RGBA8_OES || fbWidth != 240 || fbHeight != 320)
-				return;
-			uint32* dst = (uint32*)fb;
-
-			// Calculate one color per 2x2 output pixels (that's smooth enough for a blurred image, and 4x cheaper)
-			for (int x2 = 0; x2 < 160; ++x2)
-			{
-				// Horizontal interpolation position in 1/16 block units (each block is 8 output pixels wide), taken at the center of the 2x2 output pixels
-				const int px = x2 * 4 - 6;
-				int bx0 = px >> 4;
-				const int fx = px & 15;
-				int bx1 = bx0 + 1;
-				bx0 = std::max(0, std::min(39, bx0));
-				bx1 = std::max(0, std::min(39, bx1));
-				for (int y2 = 0; y2 < 120; ++y2)
-				{
-					const int py = y2 * 4 - 6;
-					int by0 = py >> 4;
-					const int fy = py & 15;
-					int by1 = by0 + 1;
-					by0 = std::max(0, std::min(29, by0));
-					by1 = std::max(0, std::min(29, by1));
-
-					uint32 channel[3];
-					for (int k = 0; k < 3; ++k)
+					else
 					{
-						const int top    = blocks[by0][bx0][k] * (16 - fx) + blocks[by0][bx1][k] * fx;
-						const int bottom = blocks[by1][bx0][k] * (16 - fx) + blocks[by1][bx1][k] * fx;
-						channel[k] = (uint32)((top * (16 - fy) + bottom * fy) >> 8);
+						uint32* dst = (uint32*)fb + dstIndex;
+						for (int i = 0; i < 8; ++i)
+						{
+							dst[i * 240] = __builtin_bswap32(srcRow[sourceX[x0 + i]] | 0xff000000u);
+						}
 					}
-					const uint32 color = (channel[0] << 24) | (channel[1] << 16) | (channel[2] << 8) | 0xff;
-					uint32* d = dst + (x2 * 2) * 240 + (239 - y2 * 2);
-					d[0] = color;			// (x, y)
-					d[-1] = color;			// (x, y+1)
-					d[240] = color;			// (x+1, y)
-					d[239] = color;			// (x+1, y+1)
 				}
 			}
+			finishBottom(fb);
+		}
 
-			GSPGPU_FlushDataCache(fb, 240 * 320 * 4);
-			gfxScreenSwapBuffers(GFX_BOTTOM, false);
+		void updateBottomScreen(const Bitmap& source)
+		{
+			const Video3DS::Config& config = Video3DS::config();
+
+			if (mBottomClearFrames > 0)
+			{
+				// Clear both framebuffers of the bottom screen once (they might hold anything after the format switch)
+				--mBottomClearFrames;
+				fillBottom(0xff000000);
+				mLastBottomMode = Video3DS::BottomMode::SOLID;
+				mLastSolidColor = 0xff000000;
+				Video3DS::sCaptureBackground = false;
+				return;
+			}
+			if (!config.mBottomEnabled)
+			{
+				Video3DS::sCaptureBackground = false;
+				return;
+			}
+
+			const Video3DS::BottomMode mode = Video3DS::sBottomMode;
+			bool capture = false;
+			if (mode != Video3DS::BottomMode::BACKGROUND)
+				mFramesSinceSnapshot = 0;
+
+			switch (mode)
+			{
+				case Video3DS::BottomMode::SOLID:
+				{
+					uint32 color = Video3DS::sBottomSolidColor;
+					if (Video3DS::sBottomSolidFollowsScreen && source.getWidth() > 4 && source.getHeight() > 4)
+						color = *source.getPixelPointer(2, 2);
+					color |= 0xff000000u;
+					if (!mBottomDrawn || mLastBottomMode != mode || color != mLastSolidColor)
+					{
+						fillBottom(color);
+						mLastSolidColor = color;
+					}
+					mLastBottomMode = mode;
+					break;
+				}
+
+				case Video3DS::BottomMode::IMAGE:
+				{
+					const Bitmap* image = Video3DS::sBottomImage;
+					if (nullptr != image && (!mBottomDrawn || mLastBottomMode != mode || mLastImage != image))
+					{
+						drawBottomBitmap(*image);
+						mLastImage = image;
+					}
+					mLastBottomMode = mode;
+					break;
+				}
+
+				case Video3DS::BottomMode::BACKGROUND:
+				{
+					if (SoftwareRenderer::sBackgroundSnapshotCounter != mLastSnapshotCounter)
+					{
+						// The renderer captured the background layer in this frame
+						mLastSnapshotCounter = SoftwareRenderer::sBackgroundSnapshotCounter;
+						mFramesSinceSnapshot = 0;
+						drawBottomBitmap(SoftwareRenderer::sBackgroundSnapshot);
+						mLastBottomMode = mode;
+					}
+					else if (++mFramesSinceSnapshot > 30 && (mLastBottomMode != Video3DS::BottomMode::SOLID || mLastSolidColor != 0xff000000u))
+					{
+						// No background layer to be seen at all (e.g. in special stages): Just black
+						fillBottom(0xff000000);
+						mLastBottomMode = Video3DS::BottomMode::SOLID;
+						mLastSolidColor = 0xff000000u;
+					}
+
+					// Tell the renderer whether to capture the background in the next frame
+					if (++mCaptureCounter >= config.mBottomRate)
+					{
+						mCaptureCounter = 0;
+						capture = true;
+					}
+					break;
+				}
+			}
+			Video3DS::sCaptureBackground = capture;
 		}
 	};
 }
@@ -815,6 +860,21 @@ void SoftwareDrawer::performRendering(const DrawCollection& drawCollection)
 {
 	for (DrawCommand* drawCommand : drawCollection.getDrawCommands())
 	{
+	#if defined(PLATFORM_3DS)
+		// Measure how much time each type of draw command takes (written to "perf.log")
+		struct CommandTimer
+		{
+			const int mType;
+			const u64 mStart = svcGetSystemTick();
+			explicit CommandTimer(int type) : mType(type) {}
+			~CommandTimer()
+			{
+				Video3DS::sCommandTicks[mType & 15] += svcGetSystemTick() - mStart;
+				++Video3DS::sCommandCount[mType & 15];
+			}
+		} commandTimer((int)drawCommand->getType());
+	#endif
+
 		switch (drawCommand->getType())
 		{
 			case DrawCommand::Type::UNDEFINED:

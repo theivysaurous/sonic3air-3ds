@@ -7,6 +7,9 @@
 */
 
 #include "oxygen/pch.h"
+#if defined(PLATFORM_3DS)
+	#include "oxygen/drawing/software/Video3DS.h"
+#endif
 #include "oxygen/application/Application.h"
 #include "oxygen/application/Configuration.h"
 #include "oxygen/application/GameLoader.h"
@@ -731,7 +734,11 @@ void Application::render()
 		Profiling::pushRegion(ProfilingRegion::FRAMESYNC);
 
 		const double currentTime = mApplicationTimer.getSecondsSinceStart() * 1000.0;
-		const double tickLengthMilliseconds = 1000.0 / (double)mSimulation->getSimulationFrequency();
+		double tickLengthMilliseconds = 1000.0 / (double)mSimulation->getSimulationFrequency();
+	#if defined(PLATFORM_3DS)
+		// Frame rate limit from "video.cfg" (30 or 60); the simulation keeps running at its normal speed, it just does two steps per frame at 30 fps
+		tickLengthMilliseconds = 1000.0 / (double)Video3DS::config().mFpsLimit;
+	#endif
 		const bool usingFramecap = (drawer.getType() != Drawer::Type::OPENGL || Configuration::instance().mFrameSync != Configuration::FrameSyncType::VSYNC_ON) && (Configuration::instance().mFrameSync != Configuration::FrameSyncType::FRAME_INTERPOLATION);
 		if (usingFramecap)
 		{
@@ -801,6 +808,18 @@ void Application::render()
 						for (const Profiling::Region::Frame& frame : pair.first->mFrameTimes)
 							maxTime = std::max(maxTime, frame.mInclusiveTime);
 						fprintf(logFile, " %s=%.1f(max %.1f)", pair.first->mName.c_str(), pair.first->mAverageTime * 1000.0, maxTime * 1000.0);
+					}
+					// Draw commands by type: milliseconds per frame (and number of commands per frame)
+					{
+						static const char* const NAMES[16] = { "undef", "windowTarget", "target", "rect", "upscaledRect", "sprite", "spriteRect", "mesh", "meshColor", "blend", "sampling", "wrap", "text", "textW", "pushScissor", "popScissor" };
+						fprintf(logFile, " || cmds ms/frame:");
+						for (int i = 0; i < 16; ++i)
+						{
+							if (Video3DS::sCommandCount[i] != 0)
+								fprintf(logFile, " %s=%.1f(%.0f)", NAMES[i], (double)Video3DS::sCommandTicks[i] * 1000.0 / 268111856.0 / 90.0, (double)Video3DS::sCommandCount[i] / 90.0);
+							Video3DS::sCommandTicks[i] = 0;
+							Video3DS::sCommandCount[i] = 0;
+						}
 					}
 					fprintf(logFile, "\n");
 					fclose(logFile);

@@ -34,6 +34,9 @@
 #include "oxygen/rendering/utils/RenderUtils.h"
 #include "oxygen/simulation/EmulatorInterface.h"
 #include "oxygen/simulation/Simulation.h"
+#if defined(PLATFORM_3DS)
+	#include "oxygen/drawing/software/Video3DS.h"
+#endif
 
 
 namespace
@@ -196,6 +199,9 @@ void GameApp::render()
 
 void GameApp::onStartGame()
 {
+#if defined(PLATFORM_3DS)
+	Video3DS::setBottomDefault();
+#endif
 	mCurrentState = State::INGAME;
 	mRemoveChild = mMenuBackground;
 	mGameView->setFadedIn();
@@ -368,6 +374,9 @@ void GameApp::gotoPhase(int phaseNumber)
 	{
 		case 0:
 		{
+#if defined(PLATFORM_3DS)
+			Video3DS::setBottomSolid(0xff000000);
+#endif
 			// Start with the disclaimer
 			mCurrentState = State::DISCLAIMER;
 			mStateTimeout = 8.0f;

@@ -24,6 +24,9 @@
 #include "oxygen/engine/EngineMain.h"
 #include "oxygen/simulation/CodeExec.h"
 #include "oxygen/simulation/Simulation.h"
+#if defined(PLATFORM_3DS)
+	#include "oxygen/drawing/software/Video3DS.h"
+#endif
 
 
 namespace detail
@@ -219,6 +222,14 @@ void MenuBackground::render()
 				mAnimatedBackgroundActive = false;
 			}
 		}
+
+#if defined(PLATFORM_3DS)
+		// Nintendo 3DS bottom screen: The scene of the main menu while it is visible, otherwise the static background of the sub menus
+		if (titleLeft < titleRight)
+			Video3DS::setBottomScene();
+		else
+			Video3DS::setBottomImage(&global::mDataSelectBackground.getBitmap());
+#endif
 
 		if (splitLight < splitBlue)
 		{

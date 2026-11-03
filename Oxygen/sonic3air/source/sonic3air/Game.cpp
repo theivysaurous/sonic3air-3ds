@@ -25,6 +25,9 @@
 #include "oxygen/application/input/InputManager.h"
 #include "oxygen/application/video/VideoOut.h"
 #include "oxygen/drawing/software/Blitter.h"
+#if defined(PLATFORM_3DS)
+	#include "oxygen/drawing/software/Video3DS.h"
+#endif
 #include "oxygen/engine/modding/ModManager.h"
 #include "oxygen/helper/FileHelper.h"
 #include "oxygen/rendering/parts/RenderParts.h"
@@ -164,6 +167,9 @@ void Game::registerScriptBindings(lemon::Module& module)
 			.setParameters("secretId");
 
 		builder.addNativeFunction("Game.triggerRestart", lemon::wrap(*this, &Game::triggerRestart), defaultFlags);
+
+		builder.addNativeFunction("Game.setBottomScreen", lemon::wrap(*this, &Game::setBottomScreen), defaultFlags)
+			.setParameters("mode");
 
 		builder.addNativeFunction("Game.onGamePause", lemon::wrap(*this, &Game::onGamePause), defaultFlags)
 			.setParameters("canRestart");
@@ -871,6 +877,14 @@ void Game::startIntoGameInternal()
 	mTimeoutUntilDiscordRefresh = 0.0f;
 }
 
+void Game::setBottomScreen(uint8 mode)
+{
+	// What to show on the bottom screen of the Nintendo 3DS (0 = level background, 1 = scene without sprites, 2 = white, 3 = black, 4 = follow the top screen's color); ignored on other platforms
+#if defined(PLATFORM_3DS)
+	Video3DS::setBottomFromScript(mode);
+#endif
+}
+
 uint32 Game::useSetting(uint32 settingId)
 {
 	return getSetting(settingId, false);
@@ -957,6 +971,9 @@ void Game::allowRestartInGamePause(uint8 canRestart)
 
 void Game::onLevelStart()
 {
+#if defined(PLATFORM_3DS)
+	Video3DS::setBottomDefault();
+#endif
 	mRestartingTimeAttack = false;
 }
 

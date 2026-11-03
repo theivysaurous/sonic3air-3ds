@@ -16,6 +16,7 @@
 #include "oxygen/drawing/Drawer.h"
 #include "oxygen/drawing/DrawerTexture.h"
 #include "oxygen/drawing/software/BlitterHelper.h"
+#include "oxygen/drawing/software/Video3DS.h"
 
 #if defined(PLATFORM_VITA)
 	#include <psp2/kernel/clib.h>
@@ -172,9 +173,39 @@ void SoftwareRenderer::renderGameScreen(const std::vector<Geometry*>& geometries
 	// Check if sprite masking needed
 	const bool usingSpriteMask = isUsingSpriteMask(geometries);
 
+	// Optional extra pass for the 3DS' bottom screen: Render only the background layer, and keep a copy of the result
+	//  -> The plane data gets buffered by the first render call, so the real pass below reuses it
+	if (Video3DS::sCaptureBackground)
+	{
+		bool any = false;
+		const bool includeBackgroundSprites = Video3DS::sCaptureBackgroundSprites;
+		const bool allPlanes = Video3DS::sCaptureAllPlanes;
+		for (size_t i = 0; i < geometries.size(); ++i)
+		{
+			const Geometry& geometry = *geometries[i];
+			const bool isPlaneB = (geometry.getType() == Geometry::Type::PLANE && (allPlanes || static_cast<const PlaneGeometry&>(geometry).mPlaneIndex == 0));
+			const bool isBackgroundSprite = includeBackgroundSprites && geometry.mRenderQueue < 0x2000 && geometry.getType() != Geometry::Type::VIEWPORT && geometry.getType() != Geometry::Type::EFFECT_BLUR;
+			if (isPlaneB || isBackgroundSprite)
+			{
+				renderGeometry(geometry);
+				any = true;
+			}
+		}
+		if (any)
+		{
+			sBackgroundSnapshot = gameScreenBitmap;
+			++sBackgroundSnapshotCounter;
+
+			// Reset everything for the real pass
+			gameScreenBitmap.clear(mRenderParts.getPaletteManager().getBackdropColor());
+			memset(mDepthBuffer, 0, sizeof(mDepthBuffer));
+			mEmptyDepthBuffer = true;
+		}
+		mCurrentViewport.set(0, 0, mGameResolution.x, mGameResolution.y);
+		mFullViewport = true;
+	}
+
 	// Render geometries
-	bool renderedPlaneB = false;
-	bool capturedBackground = false;
 	{
 		uint16 lastRenderQueue = 0xffff;
 		for (size_t i = 0; i < geometries.size(); ++i)
@@ -189,24 +220,9 @@ void SoftwareRenderer::renderGameScreen(const std::vector<Geometry*>& geometries
 				mGameScreenCopy = gameScreenBitmap;
 			}
 
-			// Capture the background layer: Everything before the first geometry that is not plane B
-			const bool isPlaneB = (geometries[i]->getType() == Geometry::Type::PLANE && static_cast<const PlaneGeometry*>(geometries[i])->mPlaneIndex == 0);
-			if (sCaptureBackground && renderedPlaneB && !capturedBackground && !isPlaneB)
-			{
-				sBackgroundSnapshot = gameScreenBitmap;
-				++sBackgroundSnapshotCounter;
-				capturedBackground = true;
-			}
-			renderedPlaneB |= isPlaneB;
-
 			renderGeometry(*geometries[i]);
 			lastRenderQueue = renderQueue;
 		}
-	}
-	if (sCaptureBackground && renderedPlaneB && !capturedBackground)
-	{
-		sBackgroundSnapshot = gameScreenBitmap;
-		++sBackgroundSnapshotCounter;
 	}
 
 	// Set alpha channel to 0xff to make sure nothing gets lost due to alpha test

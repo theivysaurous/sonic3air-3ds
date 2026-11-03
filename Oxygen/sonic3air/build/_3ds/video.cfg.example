@@ -1,20 +1,22 @@
-# Optional video test settings for the 3DS build.
+# Optional video settings for the 3DS build.
 # To use them, copy this file to /3ds/sonic3air/video.cfg on the SD card and remove the "#" in front of the lines you want.
 # Changes need a restart of the game.
 
-# Use 24-bit colour (BGR8) for the top screen instead of 32-bit (RGBA8).
+# Frame rate limit: 30 (default) or 60. 30 gives an even frame pace; 60 only helps if the game can actually reach it.
+#fps=30
+
+# Colour format of both screens: 24 (default, BGR8, also what NTR screen streaming decodes correctly) or 32 (RGBA8).
 #format=24
 
-# Write alpha 0 instead of 255 in 32-bit mode (a test for the blue tint in NTR screen streaming).
+# Write alpha 0 instead of 255 in 32-bit mode (old test, did not fix the NTR colours).
 #alpha=0
 
-# Turn off the blurred stage/menu image on the bottom screen.
+# Bottom screen: "bottom=0" turns it off (fastest, around +10 fps).
 #bottom=0
 
-# Show the game's scrolling background layer (without sprites, foreground or HUD) on the bottom screen, in sync with the top screen.
-# In menus, where there is no such layer, it falls back to the blurred picture.
+# "bottom=background" (default): the scrolling background layer of the level on the bottom screen.
+# "bottom=scene": the whole level without sprites (all layers); looks fuller but costs more.
 #bottom=background
 
-# How often the background image is updated: every N-th frame (default 2 = 30 times per second, 1 = every frame, up to 10). Higher is faster.
+# How often the bottom screen is updated: every N-th frame (default 2, 1 = every frame, up to 10). Higher is faster.
 #bottom_rate=2
-

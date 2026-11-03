@@ -149,6 +149,9 @@ function void TitleScreen()
 	ClearPatternLoadingQueue()
 	global.zone_act = 0
 	FadeOutScreenBlocking()
+#if GAMEAPP
+	Game.setBottomScreen(2)		// Nintendo 3DS: Bottom screen white while the SEGA logo is shown
+#endif
 
 #if STANDALONE
 	u32 ptr = 0x800000
@@ -264,6 +267,9 @@ function void TitleScreen()
 #endif
 
 	// While loop: SEGA logo background fade from white to black
+#if GAMEAPP
+	Game.setBottomScreen(4)		// Nintendo 3DS: Bottom screen follows the fade
+#endif
 	A1 = 0x00459c
 	while (true)
 	{
@@ -283,6 +289,9 @@ function void TitleScreen()
 	#endif
 	}
 
+#if GAMEAPP
+	Game.setBottomScreen(3)		// Nintendo 3DS: Bottom screen black during the intro with Sonic jumping in
+#endif
 	outro.wait_time = 0
 	u16[0xfffff662] = 0
 	titleintro.buffer = 0xff
@@ -412,6 +421,9 @@ function void TitleScreen()
 	// This is needed for the background to be shown in first frame at all (when VDP sprite rendering seems to be disabled)
 	Renderer.resetSprites()
 	Renderer.drawCustomSprite("bg_title_screen", getScreenExtend() - 40, 0, 0x00, 0, 0x1100)
+#endif
+#if GAMEAPP
+	Game.setBottomScreen(1)		// Nintendo 3DS: Bottom screen shows the title screen background
 #endif
 
 	while (true)

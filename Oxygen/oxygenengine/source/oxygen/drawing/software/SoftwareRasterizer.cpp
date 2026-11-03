@@ -46,12 +46,169 @@ namespace
 		}
 	}
 
+
+	// Fast integer paths for the most common textured lines (used heavily by the menu backgrounds, where the float versions were far too slow on weak CPUs like the 3DS')
+	//  -> Texture coordinates are tracked in 16.16 fixed point texel units, with wrap-around (repeat) at the texture borders
+	struct FixedLineSetup
+	{
+		int mTexW = 0;
+		int mTexH = 0;
+		int mWrapX = 0;		// Texture width in fixed point
+		int mWrapY = 0;
+		int mX = 0;			// Current position in texels, 16.16
+		int mY = 0;
+		int mDX = 0;		// Step per pixel in texels, 16.16
+		int mDY = 0;
+
+		bool setup(const BitmapView<uint32>& texture, Vec2f currentUV, const Vec2f& diffUV, int bias)
+		{
+			mTexW = texture.getSize().x;
+			mTexH = texture.getSize().y;
+			if (mTexW <= 0 || mTexH <= 0 || mTexW > 4096 || mTexH > 4096)
+				return false;
+
+			mWrapX = mTexW << 16;
+			mWrapY = mTexH << 16;
+			const float stepX = diffUV.x * (float)mWrapX;
+			const float stepY = diffUV.y * (float)mWrapY;
+			if (std::fabs(stepX) >= (float)(mWrapX / 2) || std::fabs(stepY) >= (float)(mWrapY / 2))
+				return false;
+
+			const float u = currentUV.x - std::floor(currentUV.x);
+			const float v = currentUV.y - std::floor(currentUV.y);
+			mX = (int)(u * (float)mWrapX) + bias;
+			mY = (int)(v * (float)mWrapY) + bias;
+			if (mX >= mWrapX)  mX -= mWrapX;
+			if (mY >= mWrapY)  mY -= mWrapY;
+			mDX = (int)(stepX + ((stepX >= 0.0f) ? 0.5f : -0.5f));
+			mDY = (int)(stepY + ((stepY >= 0.0f) ? 0.5f : -0.5f));
+			return true;
+		}
+
+		FORCE_INLINE void advance()
+		{
+			mX += mDX;
+			mY += mDY;
+			if (mX >= mWrapX)  mX -= mWrapX;  else if (mX < 0)  mX += mWrapX;
+			if (mY >= mWrapY)  mY -= mWrapY;  else if (mY < 0)  mY += mWrapY;
+		}
+	};
+
+	// Point sampling, no blending, no vertex colors
+	bool processPointLineOpaqueFast(uint8* output, int numPixels, const Vec2f& currentUV, const Vec2f& diffUV, const BitmapView<uint32>& texture)
+	{
+		FixedLineSetup line;
+		if (!line.setup(texture, currentUV, diffUV, 64))		// Small bias so that exact integer positions don't flicker between texels
+			return false;
+
+		uint32* out = reinterpret_cast<uint32*>(output);
+		if (line.mDY == 0)
+		{
+			const uint32* row = texture.getPixelPointer(0, line.mY >> 16);
+			if (line.mDX == 0x10000)
+			{
+				// One texel per pixel: Simply copy, with wrap-around
+				int x = line.mX >> 16;
+				int remaining = numPixels;
+				while (remaining > 0)
+				{
+					const int n = std::min(remaining, line.mTexW - x);
+					const uint32* src = row + x;
+					for (int i = 0; i < n; ++i)
+						out[i] = src[i] | 0xff000000u;
+					out += n;
+					remaining -= n;
+					x = 0;
+				}
+			}
+			else
+			{
+				for (int i = 0; i < numPixels; ++i)
+				{
+					out[i] = row[line.mX >> 16] | 0xff000000u;
+					line.mX += line.mDX;
+					if (line.mX >= line.mWrapX)  line.mX -= line.mWrapX;  else if (line.mX < 0)  line.mX += line.mWrapX;
+				}
+			}
+		}
+		else
+		{
+			for (int i = 0; i < numPixels; ++i)
+			{
+				out[i] = *texture.getPixelPointer(line.mX >> 16, line.mY >> 16) | 0xff000000u;
+				line.advance();
+			}
+		}
+		return true;
+	}
+
+	FORCE_INLINE uint32 lerpPacked(uint32 a, uint32 b, uint32 f)		// f in 0..256
+	{
+		const uint32 rb = (((a & 0x00ff00ffu) * (256 - f) + (b & 0x00ff00ffu) * f) >> 8) & 0x00ff00ffu;
+		const uint32 ag = (((a >> 8) & 0x00ff00ffu) * (256 - f) + ((b >> 8) & 0x00ff00ffu) * f) & 0xff00ff00u;
+		return rb | ag;
+	}
+
+	// Bilinear sampling, no vertex colors
+	template<bool ALPHA_BLENDING>
+	bool processBilinearLineFast(uint8* output, int numPixels, Vec2f currentUV, const Vec2f& diffUV, const BitmapView<uint32>& texture)
+	{
+		currentUV.x -= 0.5f / (float)std::max(texture.getSize().x, 1);
+		currentUV.y -= 0.5f / (float)std::max(texture.getSize().y, 1);
+
+		FixedLineSetup line;
+		if (!line.setup(texture, currentUV, diffUV, 0))
+			return false;
+
+		uint32* out = reinterpret_cast<uint32*>(output);
+		for (int i = 0; i < numPixels; ++i)
+		{
+			const int x0 = line.mX >> 16;
+			const int y0 = line.mY >> 16;
+			const int x1 = (x0 + 1 < line.mTexW) ? (x0 + 1) : 0;
+			const int y1 = (y0 + 1 < line.mTexH) ? (y0 + 1) : 0;
+			const uint32 fx = (line.mX >> 8) & 0xff;
+			const uint32 fy = (line.mY >> 8) & 0xff;
+
+			const uint32 top    = lerpPacked(*texture.getPixelPointer(x0, y0), *texture.getPixelPointer(x1, y0), fx);
+			const uint32 bottom = lerpPacked(*texture.getPixelPointer(x0, y1), *texture.getPixelPointer(x1, y1), fx);
+			const uint32 color  = lerpPacked(top, bottom, fy);
+
+			if constexpr (ALPHA_BLENDING)
+			{
+				const uint32 alpha = color >> 24;
+				const uint32 a = alpha + (alpha >> 7);		// 0..256
+				out[i] = lerpPacked(out[i], color, a) | 0xff000000u;
+			}
+			else
+			{
+				out[i] = color | 0xff000000u;
+			}
+			line.advance();
+		}
+		return true;
+	}
+
 	template<int USE_COLORS, bool BILINEAR_SAMPLING, bool ALPHA_BLENDING, bool SWAP_RED_BLUE>
 	FORCE_INLINE void processTexturedLineInternal(uint8* output, int numPixels, Color currentColor, Color diffColor, Vec2f currentUV, Vec2f diffUV, Vec2f scaleUV, const BitmapView<uint32>& texture)
 	{
 		constexpr int SAMPLE_INDEX_R = SWAP_RED_BLUE ? 2 : 0;
 		constexpr int SAMPLE_INDEX_G = 1;
 		constexpr int SAMPLE_INDEX_B = SWAP_RED_BLUE ? 0 : 2;
+
+		if constexpr (USE_COLORS == 0 && !SWAP_RED_BLUE)
+		{
+			if constexpr (BILINEAR_SAMPLING)
+			{
+				if (processBilinearLineFast<ALPHA_BLENDING>(output, numPixels, currentUV, diffUV, texture))
+					return;
+			}
+			else if constexpr (!ALPHA_BLENDING)
+			{
+				if (processPointLineOpaqueFast(output, numPixels, currentUV, diffUV, texture))
+					return;
+			}
+		}
 
 		if constexpr (BILINEAR_SAMPLING)
 		{

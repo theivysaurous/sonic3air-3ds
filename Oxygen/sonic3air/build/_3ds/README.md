@@ -77,7 +77,7 @@ Save data, config and any log files are written inside `/3ds/sonic3air/`.
 - **Speed is unknown.** It may not hold 60 FPS. Tell me what you see and I'll look at what costs the most.
 - **Memory.** If it crashes while loading, tell me where.
 - **Audio.** It uses the emulated Genesis soundtrack at a 32 kHz sample rate. If there is no sound at all, the console may be missing its DSP firmware dump (`/3ds/dspfirm.cdc`), a common requirement for homebrew audio.
-- **Controls and UI.** The game screen is 400x224 on the top screen. The bottom screen is not used yet, and desktop-style menus (mods, online features) are not adapted for the 3DS.
+- **Controls and UI.** The game screen is 400x224 on the top screen. Desktop-style menus (mods, online features) are not adapted for the 3DS.
 - **No network features.** Update checks and online features are not expected to work.
 
 ## When something fails, send me
@@ -88,7 +88,7 @@ Save data, config and any log files are written inside `/3ds/sonic3air/`.
 ## Testing and tuning
 
 - **perf.log:** The game appends timing numbers to `/3ds/sonic3air/perf.log` about every 3 seconds (frame time, simulations per second, and the time spent in simulation, audio, rendering, drawing and presenting). If it runs too slowly, send me this file after playing for a minute in a stage and a minute in the menus. Delete it first to start fresh.
-- **video.cfg:** Optional test settings, see `video.cfg.example` (24-bit colour, alpha 0 for the NTR tint test, and turning off the bottom screen image). Copy the example to `/3ds/sonic3air/video.cfg` and edit it.
-- **Bottom screen:** Shows a blurred, dimmed copy of the top screen, updated about three times a second, so it follows the current stage or menu. With `bottom=background` in `video.cfg`, it instead shows the game's scrolling background layer, in sync with the top screen (`bottom_rate=N` sets how often it updates).
+- **video.cfg:** Optional settings, see `video.cfg.example`: `fps=30|60` frame rate limit, `format=24|32` colour format, and the bottom screen options. Copy the example to `/3ds/sonic3air/video.cfg` and edit it.
+- **Bottom screen:** In levels it shows the scrolling background layer in sync with the top screen (`bottom=scene` shows the whole level without sprites, `bottom=0` turns it off, `bottom_rate=N` sets the update rate). The title screen shows white during the SEGA logo, black while Sonic jumps in, and then the title background; the main menu shows its live scene, sub menus show `dataselect_bg.png`, and the disclaimer is black.
 - **Buttons:** On the 3DS, Y is jump (like X on other platforms) and X activates Super Sonic. The button icons in menus use the Switch icon style, whose colours match the 3DS buttons (A red, B yellow, X blue, Y green).
 
