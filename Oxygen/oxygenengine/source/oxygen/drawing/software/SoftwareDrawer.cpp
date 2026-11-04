@@ -868,6 +868,15 @@ namespace softwaredrawer
 		void printText(Font& font, const StringReader& text, const Recti& rect, const DrawerPrintOptions& printOptions)
 		{
 		#if defined(PLATFORM_3DS)
+			// Long menu lists (e.g. the options) print every entry, also those far outside the visible area: Skip them early
+			{
+				const Recti& scissor = getScissorRect();
+				const int top = rect.y;
+				const int bottom = rect.y + std::max(rect.height, 1);
+				if (bottom < scissor.y - 80 || top > scissor.y + scissor.height + 80)
+					return;
+			}
+
 			// Menus print the same lines every frame, and rendering a line into a bitmap is slow on the 3DS: Keep the bitmaps of recent lines
 			uint64 key = (uint64)(uintptr_t)&font * 0x9e3779b97f4a7c15ull + (uint64)printOptions.mSpacing * 31 + 7;
 			const size_t numBytes = text.mLength * (nullptr != text.mWString ? sizeof(wchar_t) : sizeof(char));
@@ -898,6 +907,13 @@ namespace softwaredrawer
 			}
 			const Vec2i drawPosition = Font::applyAlignment(rect, cached->mInnerRect, printOptions.mAlignment);
 			const Bitmap& bufferBitmap = cached->mBitmap;
+			{
+				// Fully outside the visible area?
+				const Recti& scissor = getScissorRect();
+				if (drawPosition.x >= scissor.x + scissor.width || drawPosition.x + bufferBitmap.getWidth() <= scissor.x ||
+					drawPosition.y >= scissor.y + scissor.height || drawPosition.y + bufferBitmap.getHeight() <= scissor.y)
+					return;
+			}
 		#else
 			Bitmap& bufferBitmap = mTempBuffer;
 
