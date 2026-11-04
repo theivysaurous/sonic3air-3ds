@@ -184,7 +184,7 @@ void SoftwareRenderer::renderGameScreen(const std::vector<Geometry*>& geometries
 		{
 			const Geometry& geometry = *geometries[i];
 			const bool isPlaneB = (!Video3DS::sCaptureNoPlanes && geometry.getType() == Geometry::Type::PLANE && (allPlanes || static_cast<const PlaneGeometry&>(geometry).mPlaneIndex == 0));
-			const bool isBackgroundSprite = includeBackgroundSprites && geometry.mRenderQueue < 0x2000 && geometry.getType() != Geometry::Type::VIEWPORT && geometry.getType() != Geometry::Type::EFFECT_BLUR;
+			const bool isBackgroundSprite = includeBackgroundSprites && geometry.mRenderQueue < Video3DS::sCaptureQueueLimit && geometry.getType() != Geometry::Type::VIEWPORT && geometry.getType() != Geometry::Type::EFFECT_BLUR;
 			if (isPlaneB || isBackgroundSprite)
 			{
 				renderGeometry(geometry);

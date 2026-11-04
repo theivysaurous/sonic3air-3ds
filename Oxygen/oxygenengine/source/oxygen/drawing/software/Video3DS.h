@@ -98,6 +98,7 @@ struct Video3DS
 	static inline bool sCaptureBackground = false;
 	static inline bool sCaptureAllPlanes = true;				// Capture all planes (the level without sprites), not only plane B; avoids showing parts of plane B that are normally covered by plane A
 	static inline bool sCaptureNoPlanes = false;				// Capture only the background sprites, no planes (title screen: the background without Sonic, who is on a plane)
+	static inline uint16 sCaptureQueueLimit = 0x2000;			// Background sprites are everything with a render queue below this value
 	static inline bool sCaptureBackgroundSprites = false;		// Also capture everything below the first game layer (render queue < 0x2000), e.g. the background image of the title screen
 
 	static void setBottomSolid(uint32 colorABGR)
@@ -131,15 +132,17 @@ struct Video3DS
 		sCaptureAllPlanes = config().mBottomScene;
 		sCaptureBackgroundSprites = false;
 		sCaptureNoPlanes = false;
+		sCaptureQueueLimit = 0x2000;
 	}
 
 	// Title screen and main menu: The whole scene without sprites, including custom background sprites
-	static void setBottomScene()
+	static void setBottomScene(uint16 queueLimit = 0x2000)
 	{
 		sBottomMode = BottomMode::BACKGROUND;
 		sCaptureAllPlanes = true;
 		sCaptureBackgroundSprites = true;
 		sCaptureNoPlanes = false;
+		sCaptureQueueLimit = queueLimit;
 	}
 
 	// Title screen: Only the background sprites (sky and ocean), without Sonic and the logo
@@ -149,6 +152,7 @@ struct Video3DS
 		sCaptureAllPlanes = false;
 		sCaptureBackgroundSprites = true;
 		sCaptureNoPlanes = true;
+		sCaptureQueueLimit = 0x2000;
 	}
 
 	// Used by scripts via "Game.setBottomScreen"

@@ -226,7 +226,7 @@ void MenuBackground::render()
 #if defined(PLATFORM_3DS)
 		// Nintendo 3DS bottom screen: The scene of the main menu while it is visible, otherwise the static background of the sub menus
 		if (titleLeft < titleRight)
-			Video3DS::setBottomScene();
+			Video3DS::setBottomScene(0xa000);		// Everything except the logo (render queue 0xa000)
 		else
 			Video3DS::setBottomImage(&global::mDataSelectBackground.getBitmap());
 #endif
