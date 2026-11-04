@@ -867,10 +867,43 @@ namespace softwaredrawer
 
 		void printText(Font& font, const StringReader& text, const Recti& rect, const DrawerPrintOptions& printOptions)
 		{
+		#if defined(PLATFORM_3DS)
+			// Menus print the same lines every frame, and rendering a line into a bitmap is slow on the 3DS: Keep the bitmaps of recent lines
+			uint64 key = (uint64)(uintptr_t)&font * 0x9e3779b97f4a7c15ull + (uint64)printOptions.mSpacing * 31 + 7;
+			const size_t numBytes = text.mLength * (nullptr != text.mWString ? sizeof(wchar_t) : sizeof(char));
+			const uint8* bytes = (const uint8*)(nullptr != text.mWString ? (const void*)text.mWString : (const void*)text.mString);
+			for (size_t i = 0; i < numBytes; ++i)
+				key = (key ^ bytes[i]) * 0x100000001b3ull;
+			key ^= (nullptr != text.mWString) ? 0x5555 : 0;
+
+			CachedText* cached = nullptr;
+			for (CachedText& entry : mTextCache)
+			{
+				if (entry.mKey == key && entry.mFont == &font && entry.mLength == text.mLength)
+				{
+					cached = &entry;
+					break;
+				}
+			}
+			if (nullptr == cached)
+			{
+				if (mTextCache.size() >= 96)
+					mTextCache.erase(mTextCache.begin(), mTextCache.begin() + 32);
+				mTextCache.emplace_back();
+				cached = &mTextCache.back();
+				cached->mKey = key;
+				cached->mFont = &font;
+				cached->mLength = text.mLength;
+				font.printBitmap(cached->mBitmap, cached->mInnerRect, text, printOptions.mSpacing);
+			}
+			const Vec2i drawPosition = Font::applyAlignment(rect, cached->mInnerRect, printOptions.mAlignment);
+			const Bitmap& bufferBitmap = cached->mBitmap;
+		#else
 			Bitmap& bufferBitmap = mTempBuffer;
 
 			Vec2i drawPosition;
 			font.printBitmap(bufferBitmap, drawPosition, rect, text, printOptions.mAlignment, printOptions.mSpacing, &mTempReservedSize);
+		#endif
 
 			Blitter::Options blitterOptions;
 			blitterOptions.mBlendMode = BlendMode::ALPHA;
@@ -878,6 +911,18 @@ namespace softwaredrawer
 			blitterOptions.mSwapRedBlueChannels = needSwapRedBlueChannels();
 			mBlitter.blitSprite(Blitter::OutputWrapper(getOutputWrapper(), getScissorRect()), Blitter::SpriteWrapper(bufferBitmap, Vec2i()), drawPosition, blitterOptions);
 		}
+
+	#if defined(PLATFORM_3DS)
+		struct CachedText
+		{
+			uint64 mKey = 0;
+			Font* mFont = nullptr;
+			size_t mLength = 0;
+			Bitmap mBitmap;
+			Recti mInnerRect;
+		};
+		std::vector<CachedText> mTextCache;
+	#endif
 
 	public:
 		SDL_Window* mOutputWindow = nullptr;
