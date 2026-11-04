@@ -257,6 +257,9 @@ function void DataSelect.setup()
 #if !STANDALONE
 	set_status_register(0x2700)
 #endif
+#if GAMEAPP
+	Game.setBottomScreen(6)		// Nintendo 3DS: Bottom screen shows dataselect_bg.png
+#endif
 
 	VDP.Config.setActiveDisplay(false)
 	fn0011ca()

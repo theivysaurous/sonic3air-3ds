@@ -273,6 +273,10 @@ function void ActSelect.DrawMenu(u8 selectedEntry, u8 selectedZone, u8 selectedA
 
 function void ActSelect.Menu(u8 fadeInMethod)
 {
+#if GAMEAPP
+	Game.setBottomScreen(6)		// Nintendo 3DS: Bottom screen shows dataselect_bg.png
+#endif
+
 	// Load palette for the background
 	{
 		copyMemory(0xfffffc00, 0x39d262, 0x20)
