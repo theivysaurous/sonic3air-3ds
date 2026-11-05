@@ -303,7 +303,10 @@ function void fn01a75c()
 	if (objA0.velocity.y >= 0)
 	{
 		// For standalone, perform these checks in each frame, not just every 8th frame (which probably was originally done for performance)
-	#if !STANDALONE
+	#if PORT_3DS
+		// Nintendo 3DS: The floor check of up to 32 lost rings per frame is too slow there, so do it for each ring only in every 4th frame (staggered)
+		if (((global.framecounter + (A0.u16 >> 1)) & 3) == 0)
+	#elif !STANDALONE
 		if (((global.framecounter + D7.u8) & 7) == 0)
 	#endif
 		{
@@ -367,7 +370,10 @@ function void fn01a7e8()
 	if (objA0.velocity.y >= 0)
 	{
 		// For standalone, perform these checks in each frame, not just every 8th frame (which probably was originally done for performance)
-	#if !STANDALONE
+	#if PORT_3DS
+		// Nintendo 3DS: The floor check of up to 32 lost rings per frame is too slow there, so do it for each ring only in every 4th frame (staggered)
+		if (((global.framecounter + (A0.u16 >> 1)) & 3) == 0)
+	#elif !STANDALONE
 		if (((global.framecounter + D7.u8) & 7) == 0)
 	#endif
 		{
